@@ -113,7 +113,11 @@ class AvatarProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String?> importAvatarFile(String filePath, String name) async {
+  Future<String?> importAvatarFile(
+    String filePath,
+    String name, {
+    String? description,
+  }) async {
     final isModel = PathSanitizer.isSupportedModel(filePath);
     final isImage = PathSanitizer.isSupportedImage(filePath);
 
@@ -131,7 +135,7 @@ class AvatarProvider extends ChangeNotifier {
       name: name.trim().isEmpty ? 'Custom Avatar' : name.trim(),
       type: isModel ? AvatarType.customModel : AvatarType.customPortrait,
       styleId: 'custom',
-      description:
+      description: description ??
           'Imported user asset from ${PathSanitizer.sanitizeFileName(filePath)}',
       filePath: copiedPath,
       isCustom: true,

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:path/path.dart' as p;
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
@@ -96,6 +97,32 @@ class ObsHttpServer {
         );
       });
 
+      // Serve active custom avatar asset file (portrait image or 3D asset)
+      router.get('/avatar-asset', (Request request) async {
+        final avatar = getAvatar();
+        if (avatar.filePath != null) {
+          final file = File(avatar.filePath!);
+          if (await file.exists()) {
+            final bytes = await file.readAsBytes();
+            final ext = p.extension(avatar.filePath!).toLowerCase();
+            String mime = 'application/octet-stream';
+            if (ext == '.png') mime = 'image/png';
+            if (ext == '.jpg' || ext == '.jpeg') mime = 'image/jpeg';
+            if (ext == '.webp') mime = 'image/webp';
+            if (ext == '.glb') mime = 'model/gltf-binary';
+            return Response.ok(
+              bytes,
+              headers: {
+                'content-type': mime,
+                'access-control-allow-origin': '*',
+                'cache-control': 'no-cache',
+              },
+            );
+          }
+        }
+        return Response.notFound('No custom asset found');
+      });
+
       // Health status API
       router.get('/status', (Request request) {
         final data = {
@@ -130,6 +157,10 @@ class ObsHttpServer {
           'isTransparent': isTransparent,
           'avatar': {
             'name': avatar.name,
+            'type': avatar.type.name,
+            'isCustom': avatar.isCustom,
+            'hasAsset': avatar.filePath != null,
+            'assetUrl': '/avatar-asset',
             'styleId': avatar.styleId,
             'skinTone':
                 '#${avatar.skinTone.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}',
@@ -220,6 +251,8 @@ class ObsHttpServer {
     const canvas = document.getElementById('c');
     const ctx = canvas.getContext('2d', { alpha: true });
     let frame = null;
+    let customImg = null;
+    let customImgUrl = '';
 
     function resize() {
       canvas.width = window.innerWidth;
@@ -268,6 +301,38 @@ class ObsHttpServer {
 
       const mouthOpen = Math.max(tracking.mouthOpen || 0, audio.isVoiceActive ? (audio.mouthOpenAmount || 0) : 0);
       const smile = tracking.smile || 0;
+
+      // If user uploaded a custom portrait image, render it live with transparency
+      if (frame.avatar.hasAsset && frame.avatar.type === 'customPortrait') {
+        if (customImgUrl !== frame.avatar.assetUrl) {
+          customImgUrl = frame.avatar.assetUrl;
+          customImg = new Image();
+          customImg.src = frame.avatar.assetUrl;
+        }
+        if (customImg && customImg.complete && customImg.naturalWidth > 0) {
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.scale(scale, scale);
+          ctx.rotate(roll * 0.4);
+
+          const w = 260;
+          const h = 340;
+          const jawScale = 1.0 + (mouthOpen * 0.05);
+
+          ctx.save();
+          ctx.scale(1.0, jawScale);
+          ctx.drawImage(customImg, -w/2 + (yaw * 15), -h/2 + (pitch * 15), w, h);
+          ctx.restore();
+
+          if (audio.isVoiceActive) {
+            ctx.strokeStyle = 'rgba(0, 229, 255, 0.6)';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(-w/2 + (yaw * 15), -h/2 + (pitch * 15), w, h);
+          }
+          ctx.restore();
+          return;
+        }
+      }
 
       ctx.save();
       ctx.translate(cx, cy);

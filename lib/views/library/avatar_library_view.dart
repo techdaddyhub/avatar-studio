@@ -1,10 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/avatar_model.dart';
 import '../../providers/avatar_provider.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/upload_avatar_dialog.dart';
 
 class AvatarLibraryView extends StatelessWidget {
   const AvatarLibraryView({super.key});
@@ -46,15 +47,19 @@ class AvatarLibraryView extends StatelessWidget {
                 ),
                 const Spacer(),
                 ElevatedButton.icon(
-                  onPressed: () => _handleImport(context, avatarProv),
-                  icon: const Icon(Icons.file_upload_outlined, size: 18),
-                  label: const Text('IMPORT AVATAR'),
+                  onPressed: () => UploadAvatarDialog.show(context),
+                  icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                  label: const Text('UPLOAD AVATAR'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryCyan,
+                    foregroundColor: Colors.white,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 24),
 
-            // Avatars Grid
+            // Avatars Grid (Item 0: Upload Card, followed by existing avatars)
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -62,14 +67,75 @@ class AvatarLibraryView extends StatelessWidget {
                 crossAxisCount: 3,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 0.85,
+                childAspectRatio: 0.82,
               ),
-              itemCount: avatarProv.avatars.length,
+              itemCount: avatarProv.avatars.length + 1,
               itemBuilder: (context, index) {
-                final avatar = avatarProv.avatars[index];
+                if (index == 0) {
+                  return _buildUploadCard(context);
+                }
+                final avatar = avatarProv.avatars[index - 1];
                 final isActive = avatar.id == avatarProv.activeAvatar.id;
                 return _buildAvatarCard(context, avatar, isActive, avatarProv);
               },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUploadCard(BuildContext context) {
+    return InkWell(
+      onTap: () => UploadAvatarDialog.show(context),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.bgCard.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.primaryCyan.withValues(alpha: 0.5),
+            width: 1.5,
+          ),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primaryCyan.withValues(alpha: 0.15),
+                border: Border.all(
+                  color: AppColors.primaryCyan,
+                  width: 1.5,
+                ),
+              ),
+              child: const Icon(
+                Icons.add_photo_alternate_outlined,
+                color: AppColors.primaryCyan,
+                size: 28,
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Upload Avatar',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Import 2D portrait photo or 3D model (GLB, VRM)',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textMuted,
+              ),
             ),
           ],
         ),
@@ -83,6 +149,9 @@ class AvatarLibraryView extends StatelessWidget {
     bool isActive,
     AvatarProvider provider,
   ) {
+    final hasValidFile = avatar.filePath != null &&
+        File(avatar.filePath!).existsSync();
+
     return GlassCard(
       borderColor: isActive ? AppColors.primaryCyan : AppColors.borderSubtle,
       child: Column(
@@ -90,51 +159,103 @@ class AvatarLibraryView extends StatelessWidget {
         children: [
           // Thumbnail Preview Banner
           Expanded(
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: AppColors.bgDarkest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: avatar.clothingColor,
-                        border: Border.all(color: avatar.skinTone, width: 3),
-                      ),
-                      child: Icon(
-                        avatar.isCustom ? Icons.person_add : Icons.person,
-                        size: 32,
-                        color: avatar.skinTone,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.bgElevated,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        avatar.type.name.toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primaryCyan,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: AppColors.bgDarkest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: (hasValidFile && avatar.type == AvatarType.customPortrait)
+                    ? Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.file(
+                            File(avatar.filePath!),
+                            fit: BoxFit.cover,
+                          ),
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  AppColors.bgDarkest.withValues(alpha: 0.75),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 6,
+                            left: 6,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.bgCard.withValues(alpha: 0.85),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'PORTRAIT',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primaryCyan,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: avatar.clothingColor,
+                                border:
+                                    Border.all(color: avatar.skinTone, width: 3),
+                              ),
+                              child: Icon(
+                                avatar.type == AvatarType.customModel
+                                    ? Icons.view_in_ar
+                                    : (avatar.isCustom
+                                        ? Icons.person_add
+                                        : Icons.person),
+                                size: 32,
+                                color: avatar.skinTone,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.bgElevated,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                avatar.type.name.toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primaryCyan,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ),
@@ -249,39 +370,5 @@ class AvatarLibraryView extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  Future<void> _handleImport(
-    BuildContext context,
-    AvatarProvider provider,
-  ) async {
-    try {
-      final pickedFiles = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['glb', 'gltf', 'vrm', 'png', 'jpg', 'jpeg', 'webp'],
-      );
-
-      if (pickedFiles.isNotEmpty && pickedFiles.first.path != null) {
-        final path = pickedFiles.first.path!;
-        final name = pickedFiles.first.name.split('.').first;
-
-        final err = await provider.importAvatarFile(path, name);
-        if (err != null && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(err), backgroundColor: AppColors.accentRed),
-          );
-        } else if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Avatar imported successfully!')),
-          );
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Import error: $e')));
-      }
-    }
   }
 }
