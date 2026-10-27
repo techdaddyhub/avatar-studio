@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'core/services/storage_service.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/avatar_provider.dart';
+import 'providers/billing_provider.dart';
 import 'providers/tracking_provider.dart';
 import 'providers/audio_sync_provider.dart';
 import 'providers/obs_provider.dart';
@@ -48,6 +49,9 @@ class AvatarStudioApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ObsProvider()),
         ChangeNotifierProvider(create: (_) => HardwareProvider()),
         ChangeNotifierProvider(create: (_) => LicenseProvider()),
+        ChangeNotifierProvider(
+          create: (_) => BillingProvider(storageService: storage),
+        ),
       ],
       child: MaterialApp(
         title: 'Avatar Studio — Real-Time 3D Desktop Studio',

@@ -78,6 +78,24 @@ class ObsHttpServer {
         );
       });
 
+      // Paystack billing redirect callback
+      router.get('/billing/paystack-callback', (Request request) {
+        final ref = request.url.queryParameters['reference'] ?? '';
+        return Response.ok(
+          _generateBillingSuccessHtmlPage('Paystack', ref),
+          headers: {'content-type': 'text/html; charset=utf-8'},
+        );
+      });
+
+      // NOWPayments crypto redirect callback
+      router.get('/billing/nowpayments-callback', (Request request) {
+        final paymentId = request.url.queryParameters['payment_id'] ?? '';
+        return Response.ok(
+          _generateBillingSuccessHtmlPage('NOWPayments Crypto', paymentId),
+          headers: {'content-type': 'text/html; charset=utf-8'},
+        );
+      });
+
       // Health status API
       router.get('/status', (Request request) {
         final data = {
@@ -443,6 +461,53 @@ class ObsHttpServer {
     ctx.font = 'bold 36px monospace';
     ctx.fillText('AVATAR STUDIO — OBS CALIBRATION PATTERN 1080p 60FPS', 80, canvas.height - 60);
   </script>
+</body>
+</html>''';
+  }
+
+  static String _generateBillingSuccessHtmlPage(String gateway, String ref) {
+    return '''<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Payment Successful — Avatar Studio</title>
+  <style>
+    body {
+      background: #090D16;
+      color: #F0F4FC;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .box {
+      background: #151C30;
+      border: 1px solid #2C395B;
+      border-radius: 16px;
+      padding: 40px;
+      text-align: center;
+      max-width: 450px;
+      box-shadow: 0 10px 30px rgba(0, 229, 255, 0.1);
+    }
+    .icon {
+      font-size: 56px;
+      color: #00E676;
+      margin-bottom: 16px;
+    }
+    h2 { margin: 0 0 12px 0; color: #00E5FF; }
+    p { color: #A0AEC0; font-size: 14px; line-height: 1.5; margin: 0 0 20px 0; }
+    .ref { font-family: monospace; font-size: 12px; color: #7928CA; background: #0E1322; padding: 6px 12px; border-radius: 6px; display: inline-block; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="icon">✓</div>
+    <h2>Payment Authorized!</h2>
+    <p>Your monthly subscription has been processed via \$gateway. You can now return to the Avatar Studio desktop app.</p>
+    <div class="ref">Ref: \$ref</div>
+  </div>
 </body>
 </html>''';
   }

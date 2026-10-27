@@ -46,6 +46,8 @@ dependencies:
   vector_math: ^2.2.0
   intl: ^0.20.3
   crypto: ^3.0.8
+  http: ^1.6.0
+  url_launcher: ^6.3.3
 
 dev_dependencies:
   flutter_test:

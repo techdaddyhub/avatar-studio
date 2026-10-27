@@ -172,11 +172,44 @@ The output application bundle will be located in `build/macos/Build/Products/Rel
 
 ---
 
-## Account and Offline Licensing
+## Monthly Billing & Payment Gateway Integration
 
-Avatar Studio is designed to function completely offline without requiring internet access or mandatory account creation.
-- **Community Edition**: Free and fully functional for desktop avatar creation and OBS streaming.
-- **Creator Pro / Enterprise**: Can be activated offline via cryptographic license keys (e.g., `PRO-XXXX-XXXX` or `ENT-XXXX-XXXX`) in the **Account & License** section.
+Avatar Studio integrates with **Paystack** and **NOWPayments** for subscription billing with automated monthly renewal cycles:
+
+### Supported Monthly Plans
+- **Creator Pro Monthly (\$19 / mo)**:
+  - Commercial OBS livestreaming license.
+  - Up to 50 saved avatar profiles.
+  - Custom 3D model import (`.glb`, `.gltf`, `.vrm`).
+  - Sub-pixel 60 FPS rendering and full acoustic viseme lip-sync.
+- **Enterprise Studio Monthly (\$79 / mo)**:
+  - Multi-seat studio organization license.
+  - Unlimited saved avatar profiles.
+  - Priority shader pipeline and custom blendshapes.
+  - Monthly crypto tax receipts and dedicated OBS support.
+
+### Payment Gateways Supported
+1. **Paystack**:
+   - Supports credit/debit cards (Visa, Mastercard, Verve), bank transfers, Apple Pay, and USSD.
+   - Initialized via `https://api.paystack.co/transaction/initialize`.
+   - On completion, redirects to Avatar Studio's local Shelf callback: `http://127.0.0.1:8088/billing/paystack-callback`.
+   - Automatically verified via `https://api.paystack.co/transaction/verify/:reference`.
+2. **NOWPayments**:
+   - Supports major cryptocurrencies: USDT, Bitcoin (BTC), Ethereum (ETH), Solana (SOL), BNB, and more.
+   - Generates crypto payment invoices with live blockchain confirmations.
+   - Handled via `https://api.nowpayments.io/v1/invoice`.
+   - On payment confirmation, redirects to `http://127.0.0.1:8088/billing/nowpayments-callback`.
+
+### Subscription Lifecycle & Offline Independence
+- Upon verified payment, Avatar Studio generates an active cryptographic license token and sets a **30-day renewal cycle**.
+- The active subscription record is saved locally in sandboxed app data (`active_subscription.json`).
+- If internet is temporarily lost, your active subscription remains valid on your desktop machine until its renewal date.
+- Users can cancel their monthly subscription at any time with one click, gracefully reverting to the Free Community Edition.
+- For air-gapped systems or enterprise bulk deployments, manual offline license keys (`PRO-XXXX` or `ENT-XXXX`) are fully supported without connecting to any payment gateway.
+
+---
+
+## Account and Offline Licensing
 
 ---
 

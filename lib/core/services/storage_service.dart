@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../../models/avatar_model.dart';
+import '../../models/billing_models.dart';
 import '../constants/default_avatars.dart';
 import '../utils/path_sanitizer.dart';
 
@@ -25,6 +26,33 @@ class StorageService {
 
   File get _profilesFile => File(p.join(_appDir!.path, 'avatar_profiles.json'));
   File get _settingsFile => File(p.join(_appDir!.path, 'user_settings.json'));
+  File get _subscriptionFile =>
+      File(p.join(_appDir!.path, 'active_subscription.json'));
+
+  Future<SubscriptionRecord?> loadSubscription() async {
+    try {
+      if (await _subscriptionFile.exists()) {
+        final content = await _subscriptionFile.readAsString();
+        final json = jsonDecode(content) as Map<String, dynamic>;
+        return SubscriptionRecord.fromJson(json);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> saveSubscription(SubscriptionRecord record) async {
+    try {
+      await _subscriptionFile.writeAsString(jsonEncode(record.toJson()));
+    } catch (_) {}
+  }
+
+  Future<void> clearSubscription() async {
+    try {
+      if (await _subscriptionFile.exists()) {
+        await _subscriptionFile.delete();
+      }
+    } catch (_) {}
+  }
 
   Future<List<AvatarModel>> loadAvatars() async {
     try {
