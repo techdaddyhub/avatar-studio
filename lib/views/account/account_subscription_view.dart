@@ -22,6 +22,13 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
   );
 
   @override
+  void dispose() {
+    _keyController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final licProv = context.watch<LicenseProvider>();
     final billProv = context.watch<BillingProvider>();
@@ -38,10 +45,10 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
             // Header
             Row(
               children: [
-                Column(
+                const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Account & Monthly Subscriptions',
                       style: TextStyle(
                         fontSize: 22,
@@ -49,9 +56,9 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
-                      'Integrated monthly billing via Paystack (Cards/Bank) and NOWPayments (Cryptocurrency).',
+                      '30-Day Access Code licensing via Paystack (Cards/Bank) and NOWPayments (Cryptocurrency).',
                       style: TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -78,7 +85,19 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
             ),
             const SizedBox(height: 20),
 
-            // Active Subscription Status Banner
+            // 1. Proactive Renewal Reminder Banner (if expiring soon or expired)
+            if (billProv.isExpiringSoon || billProv.isExpired) ...[
+              _buildRenewalAlertBanner(billProv, licProv),
+              const SizedBox(height: 20),
+            ],
+
+            // 2. 30-Day Access Code Display Box (When active subscription exists)
+            if (hasSub && sub != null && sub.accessCode.isNotEmpty) ...[
+              _buildAccessCodeDisplayCard(context, sub),
+              const SizedBox(height: 20),
+            ],
+
+            // 3. Subscription Status Summary Banner
             GlassCard(
               borderColor: hasSub
                   ? AppColors.accentGreen
@@ -110,7 +129,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                       children: [
                         Text(
                           hasSub
-                              ? 'ACTIVE MONTHLY SUBSCRIPTION'
+                              ? 'ACTIVE 30-DAY SUBSCRIPTION'
                               : 'COMMUNITY EDITION (FREE LOCAL DESKTOP)',
                           style: TextStyle(
                             fontSize: 11,
@@ -124,7 +143,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                         const SizedBox(height: 4),
                         Text(
                           hasSub
-                              ? '${sub!.tier.name.toUpperCase()} — Renews in ${sub.daysRemaining} days'
+                              ? '${sub!.tier.name.toUpperCase()} — ${sub.daysRemaining} Days Remaining'
                               : licProv.entitlements.statusLabel,
                           style: const TextStyle(
                             fontSize: 16,
@@ -135,8 +154,8 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                         const SizedBox(height: 4),
                         Text(
                           hasSub
-                              ? 'Paid via ${sub!.gateway == PaymentGateway.paystack ? 'Paystack' : 'NOWPayments Crypto'} (Ref: ${sub.reference})'
-                              : 'Unlimited local desktop rendering. Upgrade to Monthly Pro for commercial streaming and up to 50 profiles.',
+                              ? 'Activated on ${sub!.activatedAt.toLocal().toString().split(' ').first} • Renews on ${sub.renewsAt.toLocal().toString().split(' ').first}'
+                              : 'Unlimited local desktop rendering. Upgrade below to generate your 30-Day Access Code for commercial streaming.',
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
@@ -150,7 +169,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
             ),
             const SizedBox(height: 24),
 
-            // Monthly Subscription Plans
+            // 4. Monthly Subscription Plans
             const Text(
               'Select Monthly Subscription Plan',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
@@ -237,7 +256,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
             ),
             const SizedBox(height: 24),
 
-            // Payment Gateway Selection
+            // 5. Payment Gateway Selection
             GlassCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -246,32 +265,35 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                     'Payment Method & Billing Gateway',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'After completing payment, a unique 30-Day Access Code will be generated and applied to this installation.',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 16),
 
                   Row(
                     children: [
-                      // Paystack Option
                       Expanded(
                         child: _buildGatewayTile(
                           gateway: PaymentGateway.paystack,
-                          title: 'Paystack',
-                          subtitle: 'Cards, Bank Transfer, Apple Pay, USSD',
+                          title: 'Paystack Billing',
+                          subtitle: 'Cards, Bank Transfer, Apple Pay (30-Day Access)',
                           icon: Icons.credit_card,
                           isSelected:
                               billProv.selectedGateway ==
                               PaymentGateway.paystack,
-                          onSelect: () =>
-                              billProv.selectGateway(PaymentGateway.paystack),
+                          onSelect: () => billProv.selectGateway(
+                            PaymentGateway.paystack,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 16),
-
-                      // NOWPayments Option
                       Expanded(
                         child: _buildGatewayTile(
                           gateway: PaymentGateway.nowpayments,
                           title: 'NOWPayments Crypto',
-                          subtitle: 'USDT, Bitcoin, Ethereum, Solana, BNB',
+                          subtitle: 'USDT, BTC, ETH, Solana, BNB (30-Day Access)',
                           icon: Icons.currency_bitcoin,
                           isSelected:
                               billProv.selectedGateway ==
@@ -290,7 +312,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                     controller: _emailController,
                     decoration: const InputDecoration(
                       labelText:
-                          'Customer Email for Receipt & Subscription Updates',
+                          'Customer Email for Receipt & 30-Day Access Code',
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
@@ -311,7 +333,10 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                         label: Text(
                           billProv.isProcessing
                               ? 'PREPARING CHECKOUT...'
-                              : 'SUBSCRIBE VIA ${billProv.selectedGateway == PaymentGateway.paystack ? 'PAYSTACK' : 'NOWPAYMENTS'} (${billProv.selectedPlan.formattedPrice})',
+                              : 'GET 30-DAY ACCESS VIA ${billProv.selectedGateway == PaymentGateway.paystack ? 'PAYSTACK' : 'NOWPAYMENTS'} (${billProv.selectedPlan.formattedPrice})',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -323,7 +348,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                                   licenseProvider: licProv,
                                 ),
                           icon: const Icon(Icons.refresh, size: 16),
-                          label: const Text('VERIFY PAYMENT STATUS'),
+                          label: const Text('VERIFY & GET ACCESS CODE'),
                         ),
                     ],
                   ),
@@ -407,18 +432,18 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
             ),
             const SizedBox(height: 24),
 
-            // Offline License Key Activation Fallback
+            // 6. Manual 30-Day Access Code Activation Card
             GlassCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Offline License Key Activation (Optional Fallback)',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                    'Activate with 30-Day Access Code',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   const Text(
-                    'If you received a pre-purchased offline key (e.g., PRO-XXXX or ENT-XXXX), activate it directly below without internet.',
+                    'Already have a 30-day Access Code (e.g., from email receipt, renewal, or another device)? Enter it below to activate your installation immediately.',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -432,18 +457,43 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                         child: TextField(
                           controller: _keyController,
                           decoration: const InputDecoration(
-                            hintText: 'e.g. PRO-8821-XXXX or ENT-9941-XXXX',
+                            hintText: 'e.g. TD-PRO-7E1A-884F or TD-ENT-9A2C-44B1',
                             border: OutlineInputBorder(),
                             isDense: true,
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
-                      OutlinedButton(
-                        onPressed: () {
-                          licProv.applyLicenseKey(_keyController.text);
-                        },
-                        child: const Text('ACTIVATE OFFLINE KEY'),
+                      ElevatedButton.icon(
+                        onPressed: billProv.isProcessing
+                            ? null
+                            : () async {
+                                final success = await billProv.activateWithAccessCode(
+                                  _keyController.text,
+                                  licenseProvider: licProv,
+                                );
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        success
+                                            ? 'Access Code activated successfully!'
+                                            : (billProv.statusMessage ??
+                                                'Failed to activate Access Code'),
+                                      ),
+                                      backgroundColor: success
+                                          ? AppColors.statusOnline
+                                          : AppColors.accentRed,
+                                    ),
+                                  );
+                                }
+                              },
+                        icon: const Icon(Icons.vpn_key, size: 16),
+                        label: const Text('ACTIVATE ACCESS CODE'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryCyan,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
                     ],
                   ),
@@ -452,6 +502,170 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAccessCodeDisplayCard(BuildContext context, SubscriptionRecord sub) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primaryCyan.withValues(alpha: 0.5), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryCyan.withValues(alpha: 0.15),
+            blurRadius: 16,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.vpn_key_outlined, size: 20, color: AppColors.primaryCyan),
+              const SizedBox(width: 10),
+              const Text(
+                'YOUR 30-DAY ACCESS CODE',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                  color: AppColors.primaryCyan,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.statusOnline.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '${sub.daysRemaining} DAYS REMAINING',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.statusOnline,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.bgDarkest,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.borderSubtle),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SelectableText(
+                    sub.accessCode,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 2.0,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: sub.accessCode));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('30-Day Access Code copied to clipboard!'),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.copy, size: 14),
+                  label: const Text('COPY CODE'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryCyan,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Keep this code safe. You can use it to re-activate this installation or transfer your active 30-day access.',
+            style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRenewalAlertBanner(BillingProvider billProv, LicenseProvider licProv) {
+    final isExpired = billProv.isExpired;
+    final color = isExpired ? AppColors.accentRed : AppColors.statusWarning;
+    final sub = billProv.activeSubscription;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isExpired ? Icons.cancel : Icons.access_time_filled,
+            color: color,
+            size: 28,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isExpired
+                      ? '30-DAY ACCESS CODE EXPIRED'
+                      : 'RENEWAL REMINDER: ${billProv.daysRemaining} DAYS REMAINING',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isExpired
+                      ? 'Your 30-day subscription ended on ${sub?.renewsAt.toLocal().toString().split(' ').first}. Renew now to generate a new 30-day Access Code.'
+                      : 'Your 30-day subscription expires on ${sub?.renewsAt.toLocal().toString().split(' ').first}. Click below to renew and get your next 30-day code.',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          ElevatedButton.icon(
+            onPressed: () => billProv.initiateMonthlyCheckout(
+              customerEmail: _emailController.text,
+              licenseProvider: licProv,
+            ),
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('RENEW NOW'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: color,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+        ],
       ),
     );
   }

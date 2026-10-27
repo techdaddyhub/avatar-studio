@@ -6,6 +6,7 @@ import '../providers/tracking_provider.dart';
 import '../providers/audio_sync_provider.dart';
 import '../providers/obs_provider.dart';
 import '../providers/hardware_provider.dart';
+import '../providers/billing_provider.dart';
 import 'metric_badge.dart';
 import 'td_logo.dart';
 
@@ -19,6 +20,7 @@ class TopStatusBar extends StatelessWidget {
     final audioProv = context.watch<AudioSyncProvider>();
     final obsProv = context.watch<ObsProvider>();
     final hwProv = context.watch<HardwareProvider>();
+    final billProv = context.watch<BillingProvider>();
 
     return Container(
       height: 48,
@@ -151,6 +153,30 @@ class TopStatusBar extends StatelessWidget {
                 value: hwProv.currentTier.name.toUpperCase(),
                 color: AppColors.primaryBlue,
               ),
+              const SizedBox(width: 8),
+
+              // 30-Day Subscription / Renewal Reminder Pill
+              if (billProv.isExpired)
+                _buildPill(
+                  label: 'SUB EXPIRED',
+                  active: true,
+                  activeColor: AppColors.accentRed,
+                  inactiveColor: AppColors.accentRed,
+                )
+              else if (billProv.isExpiringSoon)
+                _buildPill(
+                  label: 'RENEW (${billProv.daysRemaining}D LEFT)',
+                  active: true,
+                  activeColor: AppColors.statusWarning,
+                  inactiveColor: AppColors.statusWarning,
+                )
+              else if (billProv.hasActiveSubscription)
+                _buildPill(
+                  label: '30D PRO (${billProv.daysRemaining}D)',
+                  active: true,
+                  activeColor: AppColors.statusOnline,
+                  inactiveColor: AppColors.statusOnline,
+                ),
             ],
           );
         },

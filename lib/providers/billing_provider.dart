@@ -43,9 +43,19 @@ class BillingProvider extends ChangeNotifier {
       _activeSubscription != null &&
       _activeSubscription!.isActive &&
       !_activeSubscription!.isExpired;
+  bool get isExpiringSoon =>
+      _activeSubscription != null && _activeSubscription!.isExpiringSoon;
+  bool get isExpired =>
+      _activeSubscription != null && _activeSubscription!.isExpired;
+  int get daysRemaining => _activeSubscription?.daysRemaining ?? 0;
+  String get activeAccessCode => _activeSubscription?.accessCode ?? '';
 
   Future<void> _loadSubscription() async {
     _activeSubscription = await storageService.loadSubscription();
+    if (_activeSubscription != null && _activeSubscription!.isExpired) {
+      _statusMessage =
+          'Your 30-Day Access Code has expired. Please renew your subscription.';
+    }
     notifyListeners();
   }
 
@@ -161,6 +171,12 @@ class BillingProvider extends ChangeNotifier {
         final now = DateTime.now();
         final renewsAt = now.add(const Duration(days: 30));
 
+        // Generate cryptographically signed 30-Day Access Code
+        final accessCode = LicensingService.generate30DayAccessCode(
+          _selectedPlan.tier,
+          expiresAt: renewsAt,
+        );
+
         _activeSubscription = SubscriptionRecord(
           subscriptionId: 'sub_${now.millisecondsSinceEpoch}',
           gateway: _selectedGateway,
@@ -172,19 +188,17 @@ class BillingProvider extends ChangeNotifier {
           renewsAt: renewsAt,
           amountPaid: paidAmount,
           currency: currency,
+          accessCode: accessCode,
         );
 
         await storageService.saveSubscription(_activeSubscription!);
 
-        // Generate and activate valid license key
-        final tierCode = _selectedPlan.tier == SubscriptionTier.enterpriseStudio
-            ? 'ENT'
-            : 'PRO';
-        final generatedKey = '$tierCode-MONTHLY-ACTIVE';
-        licenseProvider.applyLicenseKey(generatedKey);
+        // Apply access code to license provider
+        licenseProvider.applyLicenseKey(accessCode);
 
         _status = PaymentStatus.completed;
-        _statusMessage = 'Subscription active! Renewing in 30 days.';
+        _statusMessage =
+            'Payment confirmed! 30-Day Access Code: $accessCode (Valid for 30 days)';
         _isProcessing = false;
         notifyListeners();
         return true;
@@ -199,6 +213,61 @@ class BillingProvider extends ChangeNotifier {
     _isProcessing = false;
     notifyListeners();
     return false;
+  }
+
+  /// Activates or restores subscription directly using a 30-Day Access Code
+  Future<bool> activateWithAccessCode(
+    String accessCode, {
+    required LicenseProvider licenseProvider,
+  }) async {
+    _isProcessing = true;
+    _status = PaymentStatus.verifying;
+    _statusMessage = 'Validating 30-Day Access Code...';
+    notifyListeners();
+
+    final result = LicensingService.validateAccessCode(accessCode);
+    if (!result.isValid) {
+      _isProcessing = false;
+      _status = PaymentStatus.failed;
+      _statusMessage = result.errorMessage ?? 'Invalid Access Code';
+      notifyListeners();
+      return false;
+    }
+
+    if (result.isExpired) {
+      _isProcessing = false;
+      _status = PaymentStatus.failed;
+      _statusMessage =
+          'This 30-Day Access Code expired on ${result.expiresAt.toLocal().toString().split(' ').first}. Please renew.';
+      notifyListeners();
+      return false;
+    }
+
+    final now = DateTime.now();
+    _activeSubscription = SubscriptionRecord(
+      subscriptionId: 'code_${now.millisecondsSinceEpoch}',
+      gateway: PaymentGateway.paystack,
+      reference: 'access_code_activation',
+      customerEmail: 'license@td-avatar-studio.io',
+      tier: result.tier,
+      isActive: true,
+      activatedAt: now,
+      renewsAt: result.expiresAt,
+      amountPaid:
+          result.tier == SubscriptionTier.enterpriseStudio ? 79.0 : 19.0,
+      currency: 'USD',
+      accessCode: result.code,
+    );
+
+    await storageService.saveSubscription(_activeSubscription!);
+    licenseProvider.applyLicenseKey(result.code);
+
+    _status = PaymentStatus.completed;
+    _statusMessage =
+        '30-Day Access Code activated! Active for ${result.daysRemaining} more days.';
+    _isProcessing = false;
+    notifyListeners();
+    return true;
   }
 
   Future<void> cancelSubscription({

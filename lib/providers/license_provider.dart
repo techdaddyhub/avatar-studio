@@ -24,6 +24,25 @@ class LicenseProvider extends ChangeNotifier {
       return;
     }
 
+    if (_activeKey.startsWith('TD-')) {
+      final codeRes = LicensingService.validateAccessCode(_activeKey);
+      if (codeRes.isValid) {
+        if (codeRes.isExpired) {
+          _entitlements = Entitlements.free;
+          _statusMessage =
+              '30-Day Access Code expired on ${codeRes.expiresAt.toLocal().toString().split(' ').first}. Please renew.';
+        } else {
+          _entitlements = codeRes.tier == SubscriptionTier.enterpriseStudio
+              ? Entitlements.enterprise
+              : Entitlements.pro;
+          _statusMessage =
+              '30-Day Access Code active! (${codeRes.daysRemaining} days remaining)';
+        }
+        notifyListeners();
+        return;
+      }
+    }
+
     final result = LicensingService.validateKey(_activeKey);
     _entitlements = result;
 

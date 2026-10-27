@@ -76,6 +76,7 @@ class SubscriptionRecord {
   final DateTime renewsAt;
   final double amountPaid;
   final String currency;
+  final String accessCode;
 
   const SubscriptionRecord({
     required this.subscriptionId,
@@ -88,14 +89,24 @@ class SubscriptionRecord {
     required this.renewsAt,
     required this.amountPaid,
     required this.currency,
+    this.accessCode = '',
   });
 
   bool get isExpired => DateTime.now().isAfter(renewsAt);
 
   int get daysRemaining {
-    final diff = renewsAt.difference(DateTime.now()).inDays;
-    return diff > 0 ? diff : 0;
+    final diff = renewsAt.difference(DateTime.now());
+    if (diff.isNegative) return 0;
+    return (diff.inSeconds / 86400).ceil();
   }
+
+  int get hoursRemaining {
+    final diff = renewsAt.difference(DateTime.now());
+    if (diff.isNegative) return 0;
+    return (diff.inSeconds / 3600).ceil();
+  }
+
+  bool get isExpiringSoon => !isExpired && daysRemaining <= 5;
 
   Map<String, dynamic> toJson() {
     return {
@@ -109,10 +120,25 @@ class SubscriptionRecord {
       'renewsAt': renewsAt.toIso8601String(),
       'amountPaid': amountPaid,
       'currency': currency,
+      'accessCode': accessCode,
     };
   }
 
   factory SubscriptionRecord.fromJson(Map<String, dynamic> json) {
+    final tier = SubscriptionTier.values.firstWhere(
+      (t) => t.name == json['tier'],
+      orElse: () => SubscriptionTier.creatorPro,
+    );
+    final renewsAt = json['renewsAt'] != null
+        ? DateTime.tryParse(json['renewsAt'] as String) ??
+              DateTime.now().add(const Duration(days: 30))
+        : DateTime.now().add(const Duration(days: 30));
+
+    final rawAccessCode = json['accessCode'] as String? ?? '';
+    final accessCode = rawAccessCode.isNotEmpty
+        ? rawAccessCode
+        : LicensingService.generate30DayAccessCode(tier, expiresAt: renewsAt);
+
     return SubscriptionRecord(
       subscriptionId: json['subscriptionId'] as String,
       gateway: PaymentGateway.values.firstWhere(
@@ -121,20 +147,15 @@ class SubscriptionRecord {
       ),
       reference: json['reference'] as String,
       customerEmail: json['customerEmail'] as String,
-      tier: SubscriptionTier.values.firstWhere(
-        (t) => t.name == json['tier'],
-        orElse: () => SubscriptionTier.creatorPro,
-      ),
+      tier: tier,
       isActive: json['isActive'] as bool? ?? false,
       activatedAt: json['activatedAt'] != null
           ? DateTime.tryParse(json['activatedAt'] as String) ?? DateTime.now()
           : DateTime.now(),
-      renewsAt: json['renewsAt'] != null
-          ? DateTime.tryParse(json['renewsAt'] as String) ??
-                DateTime.now().add(const Duration(days: 30))
-          : DateTime.now().add(const Duration(days: 30)),
+      renewsAt: renewsAt,
       amountPaid: (json['amountPaid'] as num?)?.toDouble() ?? 19.0,
       currency: json['currency'] as String? ?? 'USD',
+      accessCode: accessCode,
     );
   }
 }

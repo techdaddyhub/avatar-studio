@@ -7,6 +7,7 @@ import '../../providers/obs_provider.dart';
 import '../../providers/tracking_provider.dart';
 import '../../providers/audio_sync_provider.dart';
 import '../../providers/hardware_provider.dart';
+import '../../providers/billing_provider.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/sidebar_nav.dart';
 import '../../widgets/td_logo.dart';
@@ -24,6 +25,7 @@ class DashboardView extends StatelessWidget {
     final trackingProv = context.watch<TrackingProvider>();
     final audioProv = context.watch<AudioSyncProvider>();
     final hwProv = context.watch<HardwareProvider>();
+    final billProv = context.watch<BillingProvider>();
 
     return Scaffold(
       backgroundColor: AppColors.bgDarkest,
@@ -68,6 +70,12 @@ class DashboardView extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
+
+            // Subscription Renewal Reminder Banner
+            if (billProv.isExpiringSoon || billProv.isExpired) ...[
+              _buildRenewalReminderBanner(billProv),
+              const SizedBox(height: 20),
+            ],
 
             // Top Quick Status Row
             Row(
@@ -379,6 +387,69 @@ class DashboardView extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRenewalReminderBanner(BillingProvider billProv) {
+    final isExpired = billProv.isExpired;
+    final color = isExpired ? AppColors.accentRed : AppColors.statusWarning;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 1.5),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isExpired ? Icons.error_outline : Icons.notification_important_outlined,
+            color: color,
+            size: 24,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isExpired
+                      ? '30-DAY ACCESS CODE EXPIRED'
+                      : 'SUBSCRIPTION RENEWAL REMINDER (${billProv.daysRemaining} DAYS REMAINING)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  isExpired
+                      ? 'Your 30-day Access Code has expired. Renew your subscription to generate a new 30-day code and unlock commercial OBS streaming.'
+                      : 'Your 30-day subscription will expire soon (${billProv.activeSubscription?.renewsAt.toLocal().toString().split(' ').first}). Renew now to maintain uninterrupted access.',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          ElevatedButton.icon(
+            onPressed: () => onNavigate(StudioSection.accountSubscription),
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('RENEW NOW'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: color,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+          ),
+        ],
       ),
     );
   }

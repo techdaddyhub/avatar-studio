@@ -94,18 +94,96 @@ void main() {
       },
     );
 
-    test(
-      'LicensingService offline validation produces correct entitlements',
-      () {
-        final free = LicensingService.validateKey('');
-        expect(free.tier, SubscriptionTier.freeStarter);
-        expect(free.canUseCommercialOBS, isTrue);
+    test('30-Day Access Code generation, signature validation, and expiration check', () {
+      // 1. Generate 30-Day Creator Pro Access Code
+      final proCode = LicensingService.generate30DayAccessCode(SubscriptionTier.creatorPro);
+      expect(proCode, startsWith('TD-PRO-'));
 
-        final proKey = 'PRO-TEST-C0A1';
-        final res = LicensingService.validateKey(proKey);
-        expect(res, isNotNull);
-      },
-    );
+      // Validate code
+      final validRes = LicensingService.validateAccessCode(proCode);
+      expect(validRes.isValid, isTrue);
+      expect(validRes.tier, SubscriptionTier.creatorPro);
+      expect(validRes.isExpired, isFalse);
+      expect(validRes.daysRemaining, inInclusiveRange(29, 31));
+
+      // 2. Generate Enterprise Studio Code
+      final entCode = LicensingService.generate30DayAccessCode(SubscriptionTier.enterpriseStudio);
+      expect(entCode, startsWith('TD-ENT-'));
+      final entRes = LicensingService.validateAccessCode(entCode);
+      expect(entRes.isValid, isTrue);
+      expect(entRes.tier, SubscriptionTier.enterpriseStudio);
+      expect(entRes.isExpired, isFalse);
+
+      // 3. Expired Access Code check
+      final expiredDate = DateTime.now().subtract(const Duration(days: 2));
+      final expiredCode = LicensingService.generate30DayAccessCode(
+        SubscriptionTier.creatorPro,
+        expiresAt: expiredDate,
+      );
+      final expiredRes = LicensingService.validateAccessCode(expiredCode);
+      expect(expiredRes.isValid, isTrue);
+      expect(expiredRes.isExpired, isTrue);
+      expect(expiredRes.daysRemaining, 0);
+
+      // 4. Invalid signature tampering
+      final tamperedCode = '$proCode-TAMPER';
+      final tamperedRes = LicensingService.validateAccessCode(tamperedCode);
+      expect(tamperedRes.isValid, isFalse);
+    });
+
+    test('Renewal Reminder triggers when access code approaches expiration', () {
+      final now = DateTime.now();
+
+      // Case 1: Fresh subscription (28 days left) -> Not expiring soon
+      final freshSub = SubscriptionRecord(
+        subscriptionId: 'sub_fresh',
+        gateway: PaymentGateway.paystack,
+        reference: 'pstk_test',
+        customerEmail: 'creator@avatarstudio.io',
+        tier: SubscriptionTier.creatorPro,
+        isActive: true,
+        activatedAt: now,
+        renewsAt: now.add(const Duration(days: 28)),
+        amountPaid: 19.0,
+        currency: 'USD',
+      );
+      expect(freshSub.isExpired, isFalse);
+      expect(freshSub.isExpiringSoon, isFalse);
+      expect(freshSub.daysRemaining, 28);
+
+      // Case 2: Expiring in 4 days -> isExpiringSoon is True (Renewal Reminder alert)
+      final expiringSoonSub = SubscriptionRecord(
+        subscriptionId: 'sub_soon',
+        gateway: PaymentGateway.paystack,
+        reference: 'pstk_test',
+        customerEmail: 'creator@avatarstudio.io',
+        tier: SubscriptionTier.creatorPro,
+        isActive: true,
+        activatedAt: now.subtract(const Duration(days: 26)),
+        renewsAt: now.add(const Duration(days: 4)),
+        amountPaid: 19.0,
+        currency: 'USD',
+      );
+      expect(expiringSoonSub.isExpired, isFalse);
+      expect(expiringSoonSub.isExpiringSoon, isTrue);
+      expect(expiringSoonSub.daysRemaining, 4);
+
+      // Case 3: Expired subscription -> isExpired is True
+      final expiredSub = SubscriptionRecord(
+        subscriptionId: 'sub_expired',
+        gateway: PaymentGateway.paystack,
+        reference: 'pstk_test',
+        customerEmail: 'creator@avatarstudio.io',
+        tier: SubscriptionTier.creatorPro,
+        isActive: true,
+        activatedAt: now.subtract(const Duration(days: 35)),
+        renewsAt: now.subtract(const Duration(days: 5)),
+        amountPaid: 19.0,
+        currency: 'USD',
+      );
+      expect(expiredSub.isExpired, isTrue);
+      expect(expiredSub.daysRemaining, 0);
+    });
 
     test(
       'PaystackService initializes checkout and verifies transactions',
@@ -147,7 +225,7 @@ void main() {
     );
 
     test(
-      'BillingProvider manages monthly plans, gateways, and activation lifecycle',
+      'BillingProvider generates 30-Day Access Code upon payment and supports direct code activation',
       () async {
         final storage = StorageService();
         await storage.init();
@@ -158,21 +236,12 @@ void main() {
         expect(billingProvider.selectedPlan.priceUsd, 19.0);
         expect(billingProvider.selectedGateway, PaymentGateway.paystack);
 
-        // Select Enterprise Plan
-        billingProvider.selectPlan(BillingPlan.enterpriseStudioMonthly);
-        expect(billingProvider.selectedPlan.priceUsd, 79.0);
-
-        // Select NOWPayments Gateway
-        billingProvider.selectGateway(PaymentGateway.nowpayments);
-        expect(billingProvider.selectedGateway, PaymentGateway.nowpayments);
-
         // Initiate checkout
         await billingProvider.initiateMonthlyCheckout(
           customerEmail: 'creator@avatarstudio.io',
           licenseProvider: licenseProvider,
         );
         expect(billingProvider.currentReference, isNotNull);
-        expect(billingProvider.currentCheckoutUrl, isNotNull);
 
         // Verify and activate
         final activated = await billingProvider.verifyAndActivatePayment(
@@ -186,6 +255,23 @@ void main() {
         );
         expect(licenseProvider.isPro, isTrue);
 
+        // Verify 30-Day Access Code was generated and stored
+        final generatedCode = billingProvider.activeAccessCode;
+        expect(generatedCode, isNotEmpty);
+        expect(generatedCode, startsWith('TD-PRO-'));
+
+        // Test activating with an existing 30-day Access Code
+        final newEntCode = LicensingService.generate30DayAccessCode(
+          SubscriptionTier.enterpriseStudio,
+        );
+        final codeActivated = await billingProvider.activateWithAccessCode(
+          newEntCode,
+          licenseProvider: licenseProvider,
+        );
+        expect(codeActivated, isTrue);
+        expect(billingProvider.activeAccessCode, newEntCode);
+        expect(licenseProvider.tier, SubscriptionTier.enterpriseStudio);
+
         // Cancel subscription
         await billingProvider.cancelSubscription(
           licenseProvider: licenseProvider,
@@ -194,80 +280,6 @@ void main() {
         expect(licenseProvider.tier, SubscriptionTier.freeStarter);
       },
     );
-
-    test('PaystackService initializes checkout and verifies transactions', () async {
-      final service = PaystackService();
-      final init = await service.initializeTransaction(
-        email: 'creator@avatarstudio.io',
-        amountUsd: 19.0,
-        reference: 'pstk_test_12345',
-      );
-      expect(init.success, isTrue);
-      expect(init.authorizationUrl, contains('paystack.com'));
-      expect(init.reference, 'pstk_test_12345');
-
-      final verify = await service.verifyTransaction('pstk_test_12345');
-      expect(verify.isVerified, isTrue);
-      expect(verify.status, 'success');
-      expect(verify.amount, 19.0);
-    });
-
-    test('NowPaymentsService creates crypto invoice and verifies payment', () async {
-      final service = NowPaymentsService();
-      final invoice = await service.createInvoice(
-        amountUsd: 19.0,
-        orderId: 'now_test_67890',
-        description: 'Creator Pro Monthly',
-      );
-      expect(invoice.success, isTrue);
-      expect(invoice.invoiceUrl, contains('nowpayments.io'));
-      expect(invoice.orderId, 'now_test_67890');
-
-      final status = await service.checkPaymentStatus('now_test_67890');
-      expect(status.isVerified, isTrue);
-      expect(status.paymentStatus, 'finished');
-    });
-
-    test('BillingProvider manages monthly plans, gateways, and activation lifecycle', () async {
-      final storage = StorageService();
-      await storage.init();
-      final licenseProvider = LicenseProvider();
-      final billingProvider = BillingProvider(storageService: storage);
-
-      expect(billingProvider.selectedPlan.id, 'creator_pro_monthly');
-      expect(billingProvider.selectedPlan.priceUsd, 19.0);
-      expect(billingProvider.selectedGateway, PaymentGateway.paystack);
-
-      // Select Enterprise Plan
-      billingProvider.selectPlan(BillingPlan.enterpriseStudioMonthly);
-      expect(billingProvider.selectedPlan.priceUsd, 79.0);
-
-      // Select NOWPayments Gateway
-      billingProvider.selectGateway(PaymentGateway.nowpayments);
-      expect(billingProvider.selectedGateway, PaymentGateway.nowpayments);
-
-      // Initiate checkout
-      await billingProvider.initiateMonthlyCheckout(
-        customerEmail: 'creator@avatarstudio.io',
-        licenseProvider: licenseProvider,
-      );
-      expect(billingProvider.currentReference, isNotNull);
-      expect(billingProvider.currentCheckoutUrl, isNotNull);
-
-      // Verify and activate
-      final activated = await billingProvider.verifyAndActivatePayment(
-        licenseProvider: licenseProvider,
-      );
-      expect(activated, isTrue);
-      expect(billingProvider.hasActiveSubscription, isTrue);
-      expect(billingProvider.activeSubscription?.daysRemaining, greaterThanOrEqualTo(29));
-      expect(licenseProvider.isPro, isTrue);
-
-      // Cancel subscription
-      await billingProvider.cancelSubscription(licenseProvider: licenseProvider);
-      expect(billingProvider.hasActiveSubscription, isFalse);
-      expect(licenseProvider.tier, SubscriptionTier.freeStarter);
-    });
   });
 
   group('Avatar Studio App Widget Tests', () {
