@@ -138,3 +138,4 @@ class _TdLogoPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _TdLogoPainter oldDelegate) => false;
 }
+
