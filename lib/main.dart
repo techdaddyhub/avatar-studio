@@ -49,12 +49,10 @@ class AvatarStudioApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ObsProvider()),
         ChangeNotifierProvider(create: (_) => HardwareProvider()),
         ChangeNotifierProvider(create: (_) => LicenseProvider()),
-        ChangeNotifierProvider(
-          create: (_) => BillingProvider(storageService: storage),
-        ),
+        ChangeNotifierProvider(create: (_) => BillingProvider(storageService: storage)),
       ],
       child: MaterialApp(
-        title: 'Avatar Studio — Real-Time 3D Desktop Studio',
+        title: 'TD-Avatar-Studio — Real-Time 3D Desktop Studio',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
         home: const StudioMainShell(),

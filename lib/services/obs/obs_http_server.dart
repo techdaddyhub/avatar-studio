@@ -185,7 +185,7 @@ class ObsHttpServer {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Avatar Studio — OBS Transparent Source</title>
+  <title>TD-Avatar-Studio — OBS Transparent Source</title>
   <style>
     html, body {
       margin: 0;

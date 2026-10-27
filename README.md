@@ -1,12 +1,23 @@
-# Avatar Studio — Professional Desktop Avatar & Livestreaming System
+# TD-avatar-studio — Professional Desktop Avatar & Livestreaming System
+
+```
+  ████████╗██████╗        █████╗ ██╗   ██╗ █████╗ ████████╗ █████╗ ██████╗ 
+  ╚══██╔══╝██╔══██╗      ██╔══██╗██║   ██║██╔══██╗╚══██╔══╝██╔══██╗██╔══██╗
+     ██║   ██║  ██║█████╗███████║██║   ██║███████║   ██║   ███████║██████╔╝
+     ██║   ██║  ██║╚════╝██╔══██║╚██╗ ██╔╝██╔══██║   ██║   ██╔══██║██╔══██╗
+     ██║   ██████╔╝      ██║  ██║ ╚████╔╝ ██║  ██║   ██║   ██║  ██║██║  ██║
+     ╚═╝   ╚═════╝       ╚═╝  ╚═╝  ╚═══╝  ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝
+```
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.44+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.12+-0175C2?logo=dart&logoColor=white)](https://dart.dev)
 [![OBS Studio](https://img.shields.io/badge/OBS_Studio-Compatible-302E31?logo=obsstudio&logoColor=white)](https://obsproject.com)
+[![Paystack](https://img.shields.io/badge/Paystack-Integrated-00C3F7?logo=paystack&logoColor=white)](https://paystack.com)
+[![NOWPayments](https://img.shields.io/badge/NOWPayments-Crypto_Ready-2775CA)](https://nowpayments.io)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-blue)](#cross-platform-build-instructions)
 [![License](https://img.shields.io/badge/License-Community%20%2F%20Pro-00E5FF)](#account-and-offline-licensing)
 
-**Avatar Studio** is a professional, lightweight, cross-platform desktop application designed to create, animate, preview, and stream expressive digital avatars into **OBS Studio**, **Zoom**, **Microsoft Teams**, **Discord**, and **Google Meet**.
+**TD-avatar-studio** is a professional, lightweight, cross-platform desktop application designed to create, animate, preview, and stream expressive digital avatars into **OBS Studio**, **Zoom**, **Microsoft Teams**, **Discord**, and **Google Meet**. Features automated monthly billing via **Paystack** and **NOWPayments**.
 
 ---
 

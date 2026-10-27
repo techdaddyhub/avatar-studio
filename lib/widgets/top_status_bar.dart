@@ -7,6 +7,7 @@ import '../providers/audio_sync_provider.dart';
 import '../providers/obs_provider.dart';
 import '../providers/hardware_provider.dart';
 import 'metric_badge.dart';
+import 'td_logo.dart';
 
 class TopStatusBar extends StatelessWidget {
   const TopStatusBar({super.key});
@@ -35,24 +36,10 @@ class TopStatusBar extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppColors.primaryCyan, AppColors.accentPurple],
-                      ),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Icon(
-                      Icons.face_retouching_natural,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                  ),
+                  const TdLogo(size: 26),
                   const SizedBox(width: 8),
                   const Text(
-                    'AVATAR STUDIO',
+                    'TD-AVATAR-STUDIO',
                     style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 13,

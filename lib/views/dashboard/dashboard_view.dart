@@ -9,6 +9,7 @@ import '../../providers/audio_sync_provider.dart';
 import '../../providers/hardware_provider.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/sidebar_nav.dart';
+import '../../widgets/td_logo.dart';
 import '../studio/widgets/avatar_viewport.dart';
 
 class DashboardView extends StatelessWidget {
@@ -34,12 +35,14 @@ class DashboardView extends StatelessWidget {
             // Welcome Header
             Row(
               children: [
+                const TdLogo(size: 48, glow: true),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Welcome to Avatar Studio',
+                        'Welcome to TD-Avatar-Studio',
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w800,
@@ -48,7 +51,7 @@ class DashboardView extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Professional cross-platform 3D avatar workspace for OBS Studio livestreaming and video creation.',
+                        'Production-grade cross-platform 3D avatar workspace for OBS Studio livestreaming, Paystack/NOWPayments billing, and video creation.',
                         style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,

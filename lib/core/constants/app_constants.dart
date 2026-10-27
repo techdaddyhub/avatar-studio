@@ -1,7 +1,8 @@
 class AppConstants {
   AppConstants._();
 
-  static const String appName = 'Avatar Studio';
+  static const String appName = 'TD-avatar-studio';
+  static const String appTitle = 'TD-Avatar-Studio';
   static const String appVersion = '2.4.0';
   static const String appBuildNumber = '2026.1';
 

@@ -194,6 +194,80 @@ void main() {
         expect(licenseProvider.tier, SubscriptionTier.freeStarter);
       },
     );
+
+    test('PaystackService initializes checkout and verifies transactions', () async {
+      final service = PaystackService();
+      final init = await service.initializeTransaction(
+        email: 'creator@avatarstudio.io',
+        amountUsd: 19.0,
+        reference: 'pstk_test_12345',
+      );
+      expect(init.success, isTrue);
+      expect(init.authorizationUrl, contains('paystack.com'));
+      expect(init.reference, 'pstk_test_12345');
+
+      final verify = await service.verifyTransaction('pstk_test_12345');
+      expect(verify.isVerified, isTrue);
+      expect(verify.status, 'success');
+      expect(verify.amount, 19.0);
+    });
+
+    test('NowPaymentsService creates crypto invoice and verifies payment', () async {
+      final service = NowPaymentsService();
+      final invoice = await service.createInvoice(
+        amountUsd: 19.0,
+        orderId: 'now_test_67890',
+        description: 'Creator Pro Monthly',
+      );
+      expect(invoice.success, isTrue);
+      expect(invoice.invoiceUrl, contains('nowpayments.io'));
+      expect(invoice.orderId, 'now_test_67890');
+
+      final status = await service.checkPaymentStatus('now_test_67890');
+      expect(status.isVerified, isTrue);
+      expect(status.paymentStatus, 'finished');
+    });
+
+    test('BillingProvider manages monthly plans, gateways, and activation lifecycle', () async {
+      final storage = StorageService();
+      await storage.init();
+      final licenseProvider = LicenseProvider();
+      final billingProvider = BillingProvider(storageService: storage);
+
+      expect(billingProvider.selectedPlan.id, 'creator_pro_monthly');
+      expect(billingProvider.selectedPlan.priceUsd, 19.0);
+      expect(billingProvider.selectedGateway, PaymentGateway.paystack);
+
+      // Select Enterprise Plan
+      billingProvider.selectPlan(BillingPlan.enterpriseStudioMonthly);
+      expect(billingProvider.selectedPlan.priceUsd, 79.0);
+
+      // Select NOWPayments Gateway
+      billingProvider.selectGateway(PaymentGateway.nowpayments);
+      expect(billingProvider.selectedGateway, PaymentGateway.nowpayments);
+
+      // Initiate checkout
+      await billingProvider.initiateMonthlyCheckout(
+        customerEmail: 'creator@avatarstudio.io',
+        licenseProvider: licenseProvider,
+      );
+      expect(billingProvider.currentReference, isNotNull);
+      expect(billingProvider.currentCheckoutUrl, isNotNull);
+
+      // Verify and activate
+      final activated = await billingProvider.verifyAndActivatePayment(
+        licenseProvider: licenseProvider,
+      );
+      expect(activated, isTrue);
+      expect(billingProvider.hasActiveSubscription, isTrue);
+      expect(billingProvider.activeSubscription?.daysRemaining, greaterThanOrEqualTo(29));
+      expect(licenseProvider.isPro, isTrue);
+
+      // Cancel subscription
+      await billingProvider.cancelSubscription(licenseProvider: licenseProvider);
+      expect(billingProvider.hasActiveSubscription, isFalse);
+      expect(licenseProvider.tier, SubscriptionTier.freeStarter);
+    });
   });
 
   group('Avatar Studio App Widget Tests', () {
@@ -210,7 +284,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       // Top Status Bar check
-      expect(find.text('AVATAR STUDIO'), findsOneWidget);
+      expect(find.text('TD-AVATAR-STUDIO'), findsOneWidget);
       expect(find.text('v2.4'), findsOneWidget);
 
       // Main Navigation items check
@@ -221,7 +295,7 @@ void main() {
       expect(find.text('Performance'), findsOneWidget);
 
       // Welcome header on Dashboard check
-      expect(find.text('Welcome to Avatar Studio'), findsOneWidget);
+      expect(find.text('Welcome to TD-Avatar-Studio'), findsOneWidget);
     });
   });
 }
