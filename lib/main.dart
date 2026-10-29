@@ -9,10 +9,12 @@ import 'providers/audio_sync_provider.dart';
 import 'providers/obs_provider.dart';
 import 'providers/hardware_provider.dart';
 import 'providers/license_provider.dart';
+import 'providers/face_swap_provider.dart';
 import 'widgets/sidebar_nav.dart';
 import 'widgets/top_status_bar.dart';
 import 'views/dashboard/dashboard_view.dart';
 import 'views/studio/live_studio_view.dart';
+import 'views/face_swap/face_swap_view.dart';
 import 'views/library/avatar_library_view.dart';
 import 'views/creator/avatar_creator_view.dart';
 import 'views/tracking/face_tracking_view.dart';
@@ -50,6 +52,7 @@ class AvatarStudioApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => HardwareProvider()),
         ChangeNotifierProvider(create: (_) => LicenseProvider()),
         ChangeNotifierProvider(create: (_) => BillingProvider(storageService: storage)),
+        ChangeNotifierProvider(create: (_) => FaceSwapProvider(storageService: storage)),
       ],
       child: MaterialApp(
         title: 'TD-Avatar-Studio — Real-Time 3D Desktop Studio',
@@ -100,6 +103,7 @@ class _StudioMainShellState extends State<StudioMainShell> {
                         },
                       ),
                       const LiveStudioView(),
+                      const FaceSwapView(),
                       const AvatarLibraryView(),
                       const AvatarCreatorView(),
                       const FaceTrackingView(),

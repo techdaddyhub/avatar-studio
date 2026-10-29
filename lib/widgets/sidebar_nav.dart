@@ -4,6 +4,7 @@ import '../core/theme/app_colors.dart';
 enum StudioSection {
   dashboard,
   liveStudio,
+  aiFaceSwap,
   avatarLibrary,
   avatarCreator,
   faceTracking,
@@ -48,9 +49,17 @@ class SidebarNav extends StatelessWidget {
                 ),
                 _buildNavItem(
                   section: StudioSection.liveStudio,
-                  title: 'Live Avatar Studio',
+                  title: 'Live 3D Studio',
                   icon: Icons.play_circle_outline,
                   activeIcon: Icons.play_circle_fill,
+                  isHighlighted: true,
+                ),
+                _buildNavItem(
+                  section: StudioSection.aiFaceSwap,
+                  title: 'AI Face Swap',
+                  icon: Icons.face_retouching_natural,
+                  activeIcon: Icons.face_retouching_natural,
+                  badge: 'AI LIVE',
                   isHighlighted: true,
                 ),
                 const Divider(height: 18),

@@ -7,6 +7,7 @@ import '../providers/audio_sync_provider.dart';
 import '../providers/obs_provider.dart';
 import '../providers/hardware_provider.dart';
 import '../providers/billing_provider.dart';
+import '../providers/face_swap_provider.dart';
 import 'metric_badge.dart';
 import 'td_logo.dart';
 
@@ -21,6 +22,7 @@ class TopStatusBar extends StatelessWidget {
     final obsProv = context.watch<ObsProvider>();
     final hwProv = context.watch<HardwareProvider>();
     final billProv = context.watch<BillingProvider>();
+    final swapProv = context.watch<FaceSwapProvider>();
 
     return Container(
       height: 48,
@@ -136,6 +138,14 @@ class TopStatusBar extends StatelessWidget {
                 label: 'OBS',
                 active: obsProv.isServerRunning,
                 activeColor: AppColors.statusOnline,
+                inactiveColor: AppColors.statusStandby,
+              ),
+              const SizedBox(width: 6),
+
+              _buildPill(
+                label: 'AI SWAP',
+                active: swapProv.isSwapping,
+                activeColor: AppColors.primaryCyan,
                 inactiveColor: AppColors.statusStandby,
               ),
               const SizedBox(width: 8),

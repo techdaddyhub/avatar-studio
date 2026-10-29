@@ -40,7 +40,7 @@ Download production-ready precompiled release bundles directly from GitHub:
 3. [Architecture Overview](#architecture-overview)
 4. [Sample Avatars](#sample-avatars)
 5. [OBS Studio Integration](#obs-studio-integration)
-6. [Real-Time Deepfake & Face-Swap Camera Bridging](#real-time-deepfake--face-swap-camera-bridging)
+6. [Built-in Native AI Face-Swap Engine & Target Photo Library](#built-in-native-ai-face-swap-engine--target-photo-library)
 7. [Hardware Adaptation (Core i3 and Above)](#hardware-adaptation-core-i3-and-above)
 8. [Real-Time Face Tracking & Privacy](#real-time-face-tracking--privacy)
 9. [Voice & Lip-Sync Engine](#voice--lip-sync-engine)
@@ -51,6 +51,7 @@ Download production-ready precompiled release bundles directly from GitHub:
 
 ## Core Features
 
+- **Built-in Native AI Face-Swap Engine**: Real-time neural face swapping directly inside TD-Avatar-Studio. Upload any photo or choose built-in presets (Marcus, Elena, Kai, Sarah) and swap faces live on camera with dynamic head warping, eye tracking, acoustic mouth visemes, skin harmonization, and zero external dependencies.
 - **High-Performance Canvas/Shader Avatar Engine**: Real-time rendering with natural skin contours, realistic eye blinking, pupil dilation, specular highlights, and natural breathing idle dynamics.
 - **OBS Transparent Browser Source**: Delivers high-framerate (30/60 FPS) avatar frames with a true transparent alpha channel (`rgba(0,0,0,0)`) over a local embedded HTTP/WebSocket server.
 - **Real-Time Face Tracking**: Local computer vision tracking estimating Head Pitch, Yaw, Roll, Eye Blinking, Brow Raise, and Smile with EMA / Kalman jitter suppression.
@@ -227,18 +228,29 @@ The output application bundle will be located in `build/macos/Build/Products/Rel
 
 ---
 
-## Real-Time Deepfake & Face-Swap Camera Bridging
+## Built-in Native AI Face-Swap Engine & Target Photo Library
 
-TD-Avatar-Studio seamlessly bridges with open-source real-time face-swap engines (**DeepFaceLive** and **Deep-Live-Cam**) to replace or animate your face live during PC video calls, conferences, and livestreams:
+TD-Avatar-Studio includes a **100% self-contained, native Real-Time AI Face-Swap Engine** built directly into the application. You do **not** need to install external Python environments, CUDA toolkits, or third-party repositories:
 
-### Compatible Face-Swap Software:
-1. **[DeepFaceLive](https://github.com/iperov/DeepFaceLive)**:
-   - Free, open-source real-time face-swapping software utilizing InsightFace / DFM models.
-   - Routes real-time swapped output via virtual camera into OBS Studio or TD-Avatar-Studio.
-2. **[Deep-Live-Cam](https://github.com/hacksider/Deep-Live-Cam)**:
-   - Real-time live face swap from a single reference image on CPU, NVIDIA CUDA, and Apple Silicon.
-3. **OBS Virtual Camera**:
-   - Stream either the raw avatar, the swapped face, or an avatar overlay with transparent background directly into Zoom, Teams, Meet, or Discord.
+### Built-in Capabilities:
+- **Instant Target Presets**: Comes preloaded with 4 photorealistic target faces:
+  - **Marcus Vance** — Executive Tech Lead & Strategist
+  - **Elena Rostova** — Creative Director & Media Producer
+  - **Kai Chen** — Senior Solutions Architect & Engineering Host
+  - **Sarah Jenkins** — Product Manager & Broadcast Presenter
+- **Custom Photo Upload**: Click **UPLOAD PHOTO** to import any portrait photo (`.jpg`, `.jpeg`, `.png`, `.webp`). Files are sanitized against directory traversal and stored securely in your local target library.
+- **Dynamic Head Pose & Geometry Warping**: Sub-millisecond affine deformation synchronized with your webcam's Pitch, Yaw, and Roll.
+- **Natural Eye Tracking & Blink Dynamics**: Specular catchlights, realistic pupil dilation, and responsive eyelid closures.
+- **Acoustic Lip-Sync & Viseme Cavity**: Mouth opens and articulates naturally with your voice, synchronized with microphone input.
+- **Skin Tone Harmonization & Edge Feathering**: Smoothly balances color palettes between source and target faces with adjustable blend opacity and edge softness.
+- **Real-Time Landmark Mesh Overlay**: Toggle 3D wireframe mesh tracking points for live calibration.
+- **OBS Studio Alpha Channel Output**: Stream your live face swap into OBS Studio via `http://127.0.0.1:8088/avatar` or route directly through OBS Virtual Camera into Zoom, Microsoft Teams, Discord, and Google Meet.
+
+### Optional External Face-Swap Camera Bridging
+For users who already have workflows around third-party virtual cameras (**DeepFaceLive** or **Deep-Live-Cam**), TD-Avatar-Studio also supports external camera bridging:
+1. **[DeepFaceLive](https://github.com/iperov/DeepFaceLive)**: Routes external InsightFace/DFM models via virtual camera.
+2. **[Deep-Live-Cam](https://github.com/hacksider/Deep-Live-Cam)**: Real-time face swap from a single reference image.
+3. Simply select the virtual camera from TD-Avatar-Studio's device dropdown to combine external models with TD-Avatar-Studio's acoustic lip-sync and OBS streaming.
 
 ### Setup Workflow:
 ```

@@ -63,9 +63,19 @@ class DashboardView extends StatelessWidget {
                   ),
                 ),
                 ElevatedButton.icon(
+                  onPressed: () => onNavigate(StudioSection.aiFaceSwap),
+                  icon: const Icon(Icons.face_retouching_natural, size: 18),
+                  label: const Text('AI FACE SWAP'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryCyan,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
                   onPressed: () => onNavigate(StudioSection.liveStudio),
                   icon: const Icon(Icons.play_circle_fill, size: 18),
-                  label: const Text('OPEN LIVE STUDIO'),
+                  label: const Text('3D STUDIO'),
                 ),
               ],
             ),

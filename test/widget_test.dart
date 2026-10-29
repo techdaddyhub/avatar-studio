@@ -7,7 +7,10 @@ import 'package:avatar_studio/core/services/storage_service.dart';
 import 'package:avatar_studio/core/utils/path_sanitizer.dart';
 import 'package:avatar_studio/models/avatar_model.dart';
 import 'package:avatar_studio/models/billing_models.dart';
+import 'package:avatar_studio/models/face_swap_model.dart';
+import 'package:avatar_studio/core/constants/default_face_swap_targets.dart';
 import 'package:avatar_studio/providers/billing_provider.dart';
+import 'package:avatar_studio/providers/face_swap_provider.dart';
 import 'package:avatar_studio/providers/license_provider.dart';
 import 'package:avatar_studio/services/audio/viseme_extractor.dart';
 import 'package:avatar_studio/services/billing/nowpayments_service.dart';
@@ -286,6 +289,58 @@ void main() {
         expect(licenseProvider.tier, SubscriptionTier.freeStarter);
       },
     );
+
+    test('DefaultFaceSwapTargets presets exist and are valid', () {
+      final targets = DefaultFaceSwapTargets.presets;
+      expect(targets.length, 4);
+      expect(targets.any((t) => t.id == 'target_marcus_exec'), isTrue);
+      expect(targets.any((t) => t.id == 'target_elena_anchor'), isTrue);
+      expect(targets.any((t) => t.id == 'target_kai_streamer'), isTrue);
+      expect(targets.any((t) => t.id == 'target_sarah_media'), isTrue);
+
+      final marcus = DefaultFaceSwapTargets.marcusExecutive;
+      expect(marcus.name, 'Marcus Vance');
+      expect(marcus.category, contains('Executive'));
+      expect(marcus.isCustom, isFalse);
+    });
+
+    test('FaceSwapSettings JSON serialization and copyWith', () {
+      const settings = FaceSwapSettings(
+        blendOpacity: 0.9,
+        edgeFeathering: 16.0,
+      );
+      final json = settings.toJson();
+      final revived = FaceSwapSettings.fromJson(json);
+
+      expect(revived.blendOpacity, 0.9);
+      expect(revived.edgeFeathering, 16.0);
+      expect(revived.maskType, FaceMaskType.landmarksWarp);
+
+      final updated = settings.copyWith(blendOpacity: 0.8, fpsTarget: 30);
+      expect(updated.blendOpacity, 0.8);
+      expect(updated.fpsTarget, 30);
+    });
+
+    test('FaceSwapProvider manages targets, settings, and start/stop state', () async {
+      final storage = StorageService();
+      await storage.init();
+      final provider = FaceSwapProvider(storageService: storage);
+
+      expect(provider.targets.length, 4);
+      expect(provider.selectedTarget, isNotNull);
+      expect(provider.isSwapping, isFalse);
+      expect(provider.showMesh, isFalse);
+
+      provider.toggleMesh();
+      expect(provider.showMesh, isTrue);
+
+      final elena = DefaultFaceSwapTargets.elenaBroadcast;
+      provider.selectTarget(elena);
+      expect(provider.selectedTarget?.id, 'target_elena_anchor');
+
+      provider.updateSettings(const FaceSwapSettings(blendOpacity: 0.75));
+      expect(provider.settings.blendOpacity, 0.75);
+    });
   });
 
   group('Avatar Studio App Widget Tests', () {
@@ -307,7 +362,8 @@ void main() {
 
       // Main Navigation items check
       expect(find.text('Dashboard'), findsOneWidget);
-      expect(find.text('Live Avatar Studio'), findsOneWidget);
+      expect(find.text('Live 3D Studio'), findsOneWidget);
+      expect(find.text('AI Face Swap'), findsOneWidget);
       expect(find.text('Avatar Library'), findsOneWidget);
       expect(find.text('OBS Integration'), findsOneWidget);
       expect(find.text('Performance'), findsOneWidget);
