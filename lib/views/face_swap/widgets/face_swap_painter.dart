@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/face_swap_model.dart';
 import '../../../services/face_swap/face_swap_engine.dart';
+import '../../../services/rendering/upper_body_kinematics.dart';
 
 class FaceSwapPainter extends CustomPainter {
   final FaceSwapFrame? frame;
@@ -46,8 +47,19 @@ class FaceSwapPainter extends CustomPainter {
     final dy = (size.height / scale - 1000.0) / 2.0;
     canvas.translate(dx, dy);
 
-    // 1. Draw Torso / Shoulders base
-    _paintTorso(canvas, f);
+    // Upper Body & Hand Kinematics Solver
+    final upperBody = UpperBodyKinematicsSolver.solve(
+      size: const Size(1000, 1000),
+      pitch: f.headPitch,
+      yaw: f.headYaw,
+      roll: f.headRoll,
+      idleTime: DateTime.now().millisecondsSinceEpoch / 1000.0,
+      isVoiceActive: f.mouthOpening > 0.08,
+      speechEnergy: (f.mouthOpening * 1.5).clamp(0.0, 1.0),
+    );
+
+    // 1. Draw Torso / Shoulders base with Biomechanical follow-through
+    _paintTorso(canvas, f, upperBody);
 
     // 2. Draw Neck with natural shadow
     _paintNeck(canvas, f);
@@ -90,6 +102,9 @@ class FaceSwapPainter extends CustomPainter {
       _paintLandmarkMesh(canvas, f);
     }
 
+    // 10. Draw Conversational Expressive Hands in foreground
+    _paintArticulatedHands(canvas, f, upperBody);
+
     canvas.restore();
   }
 
@@ -117,13 +132,18 @@ class FaceSwapPainter extends CustomPainter {
     );
   }
 
-  void _paintTorso(Canvas canvas, FaceSwapFrame f) {
+  void _paintTorso(Canvas canvas, FaceSwapFrame f, UpperBodyPose pose) {
+    final ls = Offset(pose.leftShoulder.dx - 100, 680 + (pose.leftShoulder.dy - 550));
+    final rs = Offset(pose.rightShoulder.dx + 100, 680 + (pose.rightShoulder.dy - 550));
+
     final torsoPath = Path()
-      ..moveTo(240, 750)
-      ..cubicTo(260, 680, 360, 660, 500 + (f.headYaw * 30), 660)
-      ..cubicTo(640, 660, 740, 680, 760, 750)
-      ..lineTo(820, 1000)
-      ..lineTo(180, 1000)
+      ..moveTo(ls.dx - 40, 1000)
+      ..lineTo(ls.dx - 20, ls.dy + 60)
+      ..quadraticBezierTo(ls.dx, ls.dy, ls.dx + 60, ls.dy + 10)
+      ..lineTo(500 + (f.headYaw * 30), 660)
+      ..lineTo(rs.dx - 60, rs.dy + 10)
+      ..quadraticBezierTo(rs.dx, rs.dy, rs.dx + 20, rs.dy + 60)
+      ..lineTo(rs.dx + 40, 1000)
       ..close();
 
     final clothPaint = Paint()
@@ -134,6 +154,48 @@ class FaceSwapPainter extends CustomPainter {
       ).createShader(const Rect.fromLTWH(180, 660, 640, 340));
 
     canvas.drawPath(torsoPath, clothPaint);
+
+    // Clavicle & Collar seams
+    final collarPaint = Paint()
+      ..color = const Color(0xFF2E3D52)
+      ..strokeWidth = 3.0
+      ..style = PaintingStyle.stroke;
+    final collarPath = Path()
+      ..moveTo(420 + (f.headYaw * 20), 670)
+      ..quadraticBezierTo(500 + (f.headYaw * 20), 720, 580 + (f.headYaw * 20), 670);
+    canvas.drawPath(collarPath, collarPaint);
+  }
+
+  void _paintArticulatedHands(
+    Canvas canvas,
+    FaceSwapFrame f,
+    UpperBodyPose pose,
+  ) {
+    if (pose.leftHandElevation < 0.04 && pose.rightHandElevation < 0.04) return;
+
+    // Left hand in foreground
+    UpperBodyKinematicsSolver.paintArticulatedHand(
+      canvas: canvas,
+      wrist: Offset(pose.leftWrist.dx - 40, pose.leftWrist.dy + 80),
+      skinTone: f.skinTone,
+      isLeft: true,
+      gesturePhase: pose.leftHandGesturePhase,
+      elevation: pose.leftHandElevation,
+      fingerCurl: pose.fingerCurl,
+      scale: 1.55,
+    );
+
+    // Right hand in foreground
+    UpperBodyKinematicsSolver.paintArticulatedHand(
+      canvas: canvas,
+      wrist: Offset(pose.rightWrist.dx + 40, pose.rightWrist.dy + 80),
+      skinTone: f.skinTone,
+      isLeft: false,
+      gesturePhase: pose.rightHandGesturePhase,
+      elevation: pose.rightHandElevation,
+      fingerCurl: pose.fingerCurl,
+      scale: 1.55,
+    );
   }
 
   void _paintNeck(Canvas canvas, FaceSwapFrame f) {

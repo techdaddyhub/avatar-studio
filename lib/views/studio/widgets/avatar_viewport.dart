@@ -10,6 +10,7 @@ import '../../../providers/avatar_provider.dart';
 import '../../../providers/tracking_provider.dart';
 import '../../../providers/audio_sync_provider.dart';
 import '../../../services/rendering/avatar_painter.dart';
+import '../../../services/rendering/upper_body_kinematics.dart';
 
 class AvatarViewport extends StatefulWidget {
   final bool showCheckerboard;
@@ -127,21 +128,36 @@ class _AvatarViewportState extends State<AvatarViewport>
 
     final isSpeaking = audio.state.isVoiceActive || mouthOpen > 0.08;
 
+    // Biomechanical Upper Body & Hands Kinematics
+    final upperBody = UpperBodyKinematicsSolver.solve(
+      size: const Size(360, 480),
+      pitch: pitch,
+      yaw: yaw,
+      roll: roll,
+      idleTime: _elapsedSeconds,
+      isVoiceActive: isSpeaking,
+      speechEnergy: (mouthOpen * 1.5).clamp(0.0, 1.0),
+    );
+
     return Center(
       child: Transform(
         alignment: Alignment.center,
         transform: Matrix4.identity()
           ..setEntry(3, 2, 0.001) // 3D Perspective Depth
-          ..translateByVector3(vmath.Vector3(0.0, (avatar.offsetY * 120.0) + breathOffset, 0.0))
-          ..rotateX(-pitch * 0.35)
-          ..rotateY(yaw * 0.45)
-          ..rotateZ(roll * 0.4)
+          ..translateByVector3(vmath.Vector3(
+            (yaw * 16.0),
+            (avatar.offsetY * 120.0) + breathOffset,
+            0.0,
+          ))
+          ..rotateX(-pitch * 0.32)
+          ..rotateY(yaw * 0.38)
+          ..rotateZ(roll * 0.35)
           ..scaleByVector3(vmath.Vector3(avatar.scale, avatar.scale, 1.0)),
         child: Container(
-          width: 290,
-          height: 380,
+          width: 330,
+          height: 440,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(32),
             boxShadow: [
               // Dynamic Voice Activity Audio Glow
               if (isSpeaking)
@@ -149,26 +165,28 @@ class _AvatarViewportState extends State<AvatarViewport>
                   color: AppColors.primaryCyan.withValues(
                     alpha: 0.35 + (mouthOpen * 0.35),
                   ),
-                  blurRadius: 28 + (mouthOpen * 16),
+                  blurRadius: 32 + (mouthOpen * 16),
                   spreadRadius: 4 + (mouthOpen * 4),
                 )
               else
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
+                  color: Colors.black.withValues(alpha: 0.6),
+                  blurRadius: 28,
+                  offset: const Offset(0, 14),
                 ),
             ],
           ),
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Main User Uploaded Image with slight vertical jaw stretch during speech
+              // Main User Uploaded Image with dynamic jaw stretch & shoulder counter-sway
               ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: Transform.scale(
-                  scaleY: 1.0 + (mouthOpen * 0.04),
+                borderRadius: BorderRadius.circular(32),
+                child: Transform(
                   alignment: Alignment.topCenter,
+                  transform: Matrix4.identity()
+                    ..scaleByVector3(vmath.Vector3(1.0, 1.0 + (mouthOpen * 0.04), 1.0))
+                    ..rotateZ(-upperBody.torsoAngle * 0.15),
                   child: Image.file(
                     file,
                     fit: BoxFit.cover,
@@ -182,6 +200,20 @@ class _AvatarViewportState extends State<AvatarViewport>
                         ),
                       ),
                     ),
+                  ),
+                ),
+              ),
+
+              // Conversational Expressive Hands (Animated in foreground during speech)
+              Positioned(
+                bottom: -15,
+                left: 0,
+                right: 0,
+                height: 220,
+                child: CustomPaint(
+                  painter: _PortraitHandsOverlayPainter(
+                    pose: upperBody,
+                    skinTone: avatar.skinTone,
                   ),
                 ),
               ),
@@ -468,4 +500,55 @@ class _CheckerboardPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _PortraitHandsOverlayPainter extends CustomPainter {
+  final UpperBodyPose pose;
+  final Color skinTone;
+
+  const _PortraitHandsOverlayPainter({
+    required this.pose,
+    required this.skinTone,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (pose.leftHandElevation < 0.04 && pose.rightHandElevation < 0.04) return;
+
+    final leftWristLocal = Offset(
+      size.width * 0.24 + (math.sin(pose.leftHandGesturePhase) * (pose.leftHandElevation * 24.0)),
+      size.height - 25.0 - (pose.leftHandElevation * 135.0),
+    );
+    final rightWristLocal = Offset(
+      size.width * 0.76 + (math.sin(pose.rightHandGesturePhase) * (pose.rightHandElevation * 26.0)),
+      size.height - 25.0 - (pose.rightHandElevation * 130.0),
+    );
+
+    // Left articulated conversational hand
+    UpperBodyKinematicsSolver.paintArticulatedHand(
+      canvas: canvas,
+      wrist: leftWristLocal,
+      skinTone: skinTone,
+      isLeft: true,
+      gesturePhase: pose.leftHandGesturePhase,
+      elevation: pose.leftHandElevation,
+      fingerCurl: pose.fingerCurl,
+      scale: 1.05,
+    );
+
+    // Right articulated conversational hand
+    UpperBodyKinematicsSolver.paintArticulatedHand(
+      canvas: canvas,
+      wrist: rightWristLocal,
+      skinTone: skinTone,
+      isLeft: false,
+      gesturePhase: pose.rightHandGesturePhase,
+      elevation: pose.rightHandElevation,
+      fingerCurl: pose.fingerCurl,
+      scale: 1.05,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _PortraitHandsOverlayPainter oldDelegate) => true;
 }

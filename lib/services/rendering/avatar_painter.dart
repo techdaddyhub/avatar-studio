@@ -4,6 +4,7 @@ import '../../models/avatar_model.dart';
 import '../../models/tracking_state.dart';
 import '../../models/audio_sync_state.dart';
 import '../../models/scene_preset.dart';
+import 'upper_body_kinematics.dart';
 
 class AvatarPainter extends CustomPainter {
   final AvatarModel avatar;
@@ -60,21 +61,31 @@ class AvatarPainter extends CustomPainter {
 
     final smile = tracking.smile;
 
+    // Biomechanical Upper Body & Hand Kinematics Solver
+    final upperBody = UpperBodyKinematicsSolver.solve(
+      size: const Size(600, 600),
+      pitch: pitch,
+      yaw: yaw,
+      roll: roll,
+      idleTime: idleTimeSeconds,
+      isVoiceActive: audio.isVoiceActive,
+      speechEnergy: (mouthOpen * 1.5).clamp(0.0, 1.0),
+    );
+
     canvas.save();
     // Center avatar
     canvas.translate(cx, cy + breathOffset);
     canvas.scale(avatar.scale);
 
-    // 3D-like Head Tilt and Rotation
-    canvas.rotate(roll * 0.4);
+    // 1. Draw Shoulders, Torso, and Arms with Biomechanical follow-through
+    _drawTorsoWithKinematics(canvas, upperBody, yaw, pitch);
 
-    // Draw Shoulders and Torso
-    _drawTorso(canvas, size, yaw, pitch);
-
-    // Draw Neck
+    // 2. Draw Neck
     _drawNeck(canvas, yaw, pitch);
 
-    // Draw Head Base & Hair Back
+    // 3. Draw Head Base & Hair (with natural head rotation)
+    canvas.save();
+    canvas.rotate(roll * 0.4);
     _drawHeadAndHair(
       canvas,
       yaw,
@@ -84,48 +95,102 @@ class AvatarPainter extends CustomPainter {
       mouthOpen,
       smile,
     );
+    canvas.restore();
+
+    // 4. Draw Articulated Hands in foreground (gestures naturally when speaking)
+    _drawArticulatedHands(canvas, upperBody);
 
     canvas.restore();
   }
 
-  void _drawTorso(Canvas canvas, Size size, double yaw, double pitch) {
+  void _drawTorsoWithKinematics(
+    Canvas canvas,
+    UpperBodyPose pose,
+    double yaw,
+    double pitch,
+  ) {
+    canvas.save();
+    canvas.rotate(pose.torsoAngle * 0.4);
+
     final torsoPaint = Paint()
       ..color = avatar.clothingColor
       ..style = PaintingStyle.fill;
 
-    final path = Path();
-    final torsoWidth = 260.0;
-    final torsoTop = 130.0 + (pitch * 8.0);
-    final torsoBottom = 340.0;
+    final torsoTop = 125.0 + (pitch * 8.0);
+    final torsoBottom = 350.0;
+    final ls = Offset(pose.leftShoulder.dx - 300, torsoTop + (pose.leftShoulder.dy - 350));
+    final rs = Offset(pose.rightShoulder.dx - 300, torsoTop + (pose.rightShoulder.dy - 350));
 
-    path.moveTo(-torsoWidth / 2 + (yaw * 15), torsoBottom);
-    path.quadraticBezierTo(
-      -torsoWidth * 0.45,
-      torsoTop + 20,
-      -70 + (yaw * 20),
-      torsoTop,
-    );
-    path.lineTo(70 + (yaw * 20), torsoTop);
-    path.quadraticBezierTo(
-      torsoWidth * 0.45,
-      torsoTop + 20,
-      torsoWidth / 2 + (yaw * 15),
-      torsoBottom,
-    );
-    path.close();
+    final path = Path()
+      ..moveTo(ls.dx - 20, torsoBottom)
+      ..lineTo(ls.dx - 10, ls.dy + 40)
+      ..quadraticBezierTo(ls.dx, ls.dy, ls.dx + 40, ls.dy + 5)
+      ..lineTo(-35 + (yaw * 15), torsoTop + 20)
+      ..lineTo(35 + (yaw * 15), torsoTop + 20)
+      ..lineTo(rs.dx - 40, rs.dy + 5)
+      ..quadraticBezierTo(rs.dx, rs.dy, rs.dx + 10, rs.dy + 40)
+      ..lineTo(rs.dx + 20, torsoBottom)
+      ..close();
 
     canvas.drawPath(path, torsoPaint);
 
-    // Clothing Collar / Accent line
-    final collarPaint = Paint()
-      ..color = avatar.clothingColor.withValues(alpha: 0.7)
-      ..strokeWidth = 3.0
+    // Shaded Clavicle / Collarbone contour
+    final claviclePaint = Paint()
+      ..color = avatar.clothingColor.withValues(alpha: 0.75)
+      ..strokeWidth = 3.5
       ..style = PaintingStyle.stroke;
 
     final collarPath = Path()
-      ..moveTo(-45 + (yaw * 15), torsoTop)
-      ..quadraticBezierTo(yaw * 15, torsoTop + 45, 45 + (yaw * 15), torsoTop);
-    canvas.drawPath(collarPath, collarPaint);
+      ..moveTo(-50 + (yaw * 15), torsoTop + 20)
+      ..quadraticBezierTo(yaw * 15, torsoTop + 65, 50 + (yaw * 15), torsoTop + 20);
+    canvas.drawPath(collarPath, claviclePaint);
+
+    // Fabric folds / Lighting depth
+    final foldPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.15)
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(
+      Offset(ls.dx + 25, ls.dy + 35),
+      Offset(-20 + (yaw * 10), torsoTop + 85),
+      foldPaint,
+    );
+    canvas.drawLine(
+      Offset(rs.dx - 25, rs.dy + 35),
+      Offset(20 + (yaw * 10), torsoTop + 85),
+      foldPaint,
+    );
+
+    canvas.restore();
+  }
+
+  void _drawArticulatedHands(Canvas canvas, UpperBodyPose pose) {
+    final leftWristLocal = Offset(pose.leftWrist.dx - 300, pose.leftWrist.dy - 400);
+    final rightWristLocal = Offset(pose.rightWrist.dx - 300, pose.rightWrist.dy - 400);
+
+    // Left Hand
+    UpperBodyKinematicsSolver.paintArticulatedHand(
+      canvas: canvas,
+      wrist: leftWristLocal,
+      skinTone: avatar.skinTone,
+      isLeft: true,
+      gesturePhase: pose.leftHandGesturePhase,
+      elevation: pose.leftHandElevation,
+      fingerCurl: pose.fingerCurl,
+      scale: 0.95,
+    );
+
+    // Right Hand
+    UpperBodyKinematicsSolver.paintArticulatedHand(
+      canvas: canvas,
+      wrist: rightWristLocal,
+      skinTone: avatar.skinTone,
+      isLeft: false,
+      gesturePhase: pose.rightHandGesturePhase,
+      elevation: pose.rightHandElevation,
+      fingerCurl: pose.fingerCurl,
+      scale: 0.95,
+    );
   }
 
   void _drawNeck(Canvas canvas, double yaw, double pitch) {

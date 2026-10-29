@@ -302,6 +302,39 @@ class ObsHttpServer {
       const mouthOpen = Math.max(tracking.mouthOpen || 0, audio.isVoiceActive ? (audio.mouthOpenAmount || 0) : 0);
       const smile = tracking.smile || 0;
 
+      function drawHand(ctx, x, y, skin, isLeft, phase, elev) {
+        if (elev < 0.05) return;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(isLeft ? 0.25 + Math.sin(phase)*0.15 : -0.25 - Math.sin(phase)*0.15);
+        ctx.fillStyle = skin;
+        // Palm
+        ctx.beginPath();
+        ctx.roundRect(-22, -16, 44, 56, 14);
+        ctx.fill();
+        // Fingers
+        const fConfigs = [
+          { x: isLeft ? 11 : -11, len: 34, w: 9.5 },
+          { x: isLeft ? 3.5 : -3.5, len: 40, w: 10 },
+          { x: isLeft ? -4.5 : 4.5, len: 36, w: 9.5 },
+          { x: isLeft ? -12 : 12, len: 28, w: 8.5 },
+        ];
+        for (const cfg of fConfigs) {
+          ctx.beginPath();
+          ctx.roundRect(cfg.x - cfg.w/2, -16 - cfg.len, cfg.w, cfg.len + 5, cfg.w/2);
+          ctx.fill();
+        }
+        // Thumb
+        ctx.save();
+        ctx.translate(isLeft ? 18 : -18, 6);
+        ctx.rotate(isLeft ? 0.65 : -0.65);
+        ctx.beginPath();
+        ctx.roundRect(-7, -24, 14, 26, 7);
+        ctx.fill();
+        ctx.restore();
+        ctx.restore();
+      }
+
       // If user uploaded a custom portrait image, render it live with transparency
       if (frame.avatar.hasAsset && frame.avatar.type === 'customPortrait') {
         if (customImgUrl !== frame.avatar.assetUrl) {
@@ -313,22 +346,33 @@ class ObsHttpServer {
           ctx.save();
           ctx.translate(cx, cy);
           ctx.scale(scale, scale);
-          ctx.rotate(roll * 0.4);
+          ctx.rotate(roll * 0.35);
 
-          const w = 260;
-          const h = 340;
-          const jawScale = 1.0 + (mouthOpen * 0.05);
+          const w = 310;
+          const h = 420;
+          const jawScale = 1.0 + (mouthOpen * 0.04);
 
           ctx.save();
           ctx.scale(1.0, jawScale);
           ctx.drawImage(customImg, -w/2 + (yaw * 15), -h/2 + (pitch * 15), w, h);
           ctx.restore();
 
-          if (audio.isVoiceActive) {
-            ctx.strokeStyle = 'rgba(0, 229, 255, 0.6)';
-            ctx.lineWidth = 4;
-            ctx.strokeRect(-w/2 + (yaw * 15), -h/2 + (pitch * 15), w, h);
-          }
+          // Conversational Hands for Custom Portrait in OBS
+          const isSpeaking = audio.isVoiceActive || mouthOpen > 0.08;
+          const elev = isSpeaking ? Math.min(1.0, 0.6 + mouthOpen * 0.5) : 0.0;
+          const timeSec = Date.now() / 1000;
+          const leftPhase = timeSec * 2.8;
+          const rightPhase = timeSec * 2.5 + 1.2;
+          const skin = frame.avatar.skinTone || '#C68662';
+
+          const leftHandX = -w * 0.28 + Math.sin(leftPhase) * (elev * 25);
+          const leftHandY = h / 2 - 30 - (elev * 140);
+          drawHand(ctx, leftHandX, leftHandY, skin, true, leftPhase, elev);
+
+          const rightHandX = w * 0.28 + Math.sin(rightPhase) * (elev * 27);
+          const rightHandY = h / 2 - 30 - (elev * 135);
+          drawHand(ctx, rightHandX, rightHandY, skin, false, rightPhase, elev);
+
           ctx.restore();
           return;
         }
@@ -477,6 +521,22 @@ class ObsHttpServer {
       ctx.quadraticCurveTo(hx + 95, hy - 95, hx, hy - 110);
       ctx.quadraticCurveTo(hx - 95, hy - 95, hx - 80, hy - 65);
       ctx.fill();
+
+      // Conversational Hands for Procedural Avatar in OBS
+      const isSpeakingP = audio.isVoiceActive || mouthOpen > 0.08;
+      const elevP = isSpeakingP ? Math.min(1.0, 0.6 + mouthOpen * 0.5) : 0.0;
+      const timeSecP = Date.now() / 1000;
+      const leftPhaseP = timeSecP * 2.8;
+      const rightPhaseP = timeSecP * 2.5 + 1.2;
+      const skinP = frame.avatar.skinTone || '#F5D0B5';
+
+      const leftHandXP = -85 + Math.sin(leftPhaseP) * (elevP * 25);
+      const leftHandYP = 220 - (elevP * 140);
+      drawHand(ctx, leftHandXP, leftHandYP, skinP, true, leftPhaseP, elevP);
+
+      const rightHandXP = 85 + Math.sin(rightPhaseP) * (elevP * 27);
+      const rightHandYP = 220 - (elevP * 135);
+      drawHand(ctx, rightHandXP, rightHandYP, skinP, false, rightPhaseP, elevP);
 
       ctx.restore();
     }
