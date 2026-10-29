@@ -106,9 +106,9 @@ jobs:
 
       - name: Package macOS Binary
         run: |
-          mkdir -p dist
+          mkdir -p "$GITHUB_WORKSPACE/dist"
           cd build/macos/Build/Products/Release
-          zip -r ../../../../dist/TD-Avatar-Studio-macOS.zip *.app
+          zip -r "$GITHUB_WORKSPACE/dist/TD-Avatar-Studio-macOS.zip" *.app
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
@@ -129,18 +129,21 @@ jobs:
         with:
           name: TD-Avatar-Studio-Linux-x64
           path: release_assets
+          merge-multiple: true
 
       - name: Download Windows Artifact
         uses: actions/download-artifact@v4
         with:
           name: TD-Avatar-Studio-Windows-x64
           path: release_assets
+          merge-multiple: true
 
       - name: Download macOS Artifact
         uses: actions/download-artifact@v4
         with:
           name: TD-Avatar-Studio-macOS
           path: release_assets
+          merge-multiple: true
 
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
@@ -149,7 +152,7 @@ jobs:
           name: "TD-Avatar-Studio ${{ github.event.inputs.release_tag || github.ref_name }} — Production Ready"
           draft: false
           prerelease: false
-          files: release_assets/*
+          files: release_assets/**/*
           body: |
             ## TD-Avatar-Studio Production Release
             Production-grade cross-platform 3D avatar workspace for OBS Studio livestreaming, Paystack & NOWPayments commercial licensing, and real-time deepfake/face-swap avatar streaming.
