@@ -71,8 +71,8 @@ class DashboardView extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Subscription Renewal Reminder Banner
-            if (billProv.isExpiringSoon || billProv.isExpired) ...[
+            // Subscription Renewal Reminder Banner (only for time-limited licenses)
+            if (!billProv.isLifetime && (billProv.isExpiringSoon || billProv.isExpired)) ...[
               _buildRenewalReminderBanner(billProv),
               const SizedBox(height: 20),
             ],

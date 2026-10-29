@@ -94,27 +94,29 @@ void main() {
       },
     );
 
-    test('30-Day Access Code generation, signature validation, and expiration check', () {
-      // 1. Generate 30-Day Creator Pro Access Code
+    test('1-Time Lifetime Access Code generation, signature validation, and perpetual access', () {
+      // 1. Generate 1-Time Lifetime Access Code
+      final lifeCode = LicensingService.generateLifetimeAccessCode();
+      expect(lifeCode, startsWith('TD-LIFE-'));
+
+      // Validate lifetime code
+      final validRes = LicensingService.validateAccessCode(lifeCode);
+      expect(validRes.isValid, isTrue);
+      expect(validRes.tier, SubscriptionTier.lifetimeStudio);
+      expect(validRes.isExpired, isFalse);
+      expect(validRes.isLifetime, isTrue);
+      expect(validRes.daysRemaining, 99999);
+
+      // Validate legacy 30-day code compatibility
       final proCode = LicensingService.generate30DayAccessCode(SubscriptionTier.creatorPro);
       expect(proCode, startsWith('TD-PRO-'));
+      final proRes = LicensingService.validateAccessCode(proCode);
+      expect(proRes.isValid, isTrue);
+      expect(proRes.tier, SubscriptionTier.creatorPro);
+      expect(proRes.isExpired, isFalse);
+      expect(proRes.daysRemaining, inInclusiveRange(29, 31));
 
-      // Validate code
-      final validRes = LicensingService.validateAccessCode(proCode);
-      expect(validRes.isValid, isTrue);
-      expect(validRes.tier, SubscriptionTier.creatorPro);
-      expect(validRes.isExpired, isFalse);
-      expect(validRes.daysRemaining, inInclusiveRange(29, 31));
-
-      // 2. Generate Enterprise Studio Code
-      final entCode = LicensingService.generate30DayAccessCode(SubscriptionTier.enterpriseStudio);
-      expect(entCode, startsWith('TD-ENT-'));
-      final entRes = LicensingService.validateAccessCode(entCode);
-      expect(entRes.isValid, isTrue);
-      expect(entRes.tier, SubscriptionTier.enterpriseStudio);
-      expect(entRes.isExpired, isFalse);
-
-      // 3. Expired Access Code check
+      // Expired legacy code check
       final expiredDate = DateTime.now().subtract(const Duration(days: 2));
       final expiredCode = LicensingService.generate30DayAccessCode(
         SubscriptionTier.creatorPro,
@@ -125,33 +127,34 @@ void main() {
       expect(expiredRes.isExpired, isTrue);
       expect(expiredRes.daysRemaining, 0);
 
-      // 4. Invalid signature tampering
-      final tamperedCode = '$proCode-TAMPER';
+      // Invalid signature tampering
+      final tamperedCode = '$lifeCode-TAMPER';
       final tamperedRes = LicensingService.validateAccessCode(tamperedCode);
       expect(tamperedRes.isValid, isFalse);
     });
 
-    test('Renewal Reminder triggers when access code approaches expiration', () {
+    test('Renewal Reminder triggers only for expiring time-limited licenses and not lifetime licenses', () {
       final now = DateTime.now();
 
-      // Case 1: Fresh subscription (28 days left) -> Not expiring soon
-      final freshSub = SubscriptionRecord(
-        subscriptionId: 'sub_fresh',
+      // Case 1: 1-Time Lifetime license (₦200,000) -> Never expiring, no reminder
+      final lifetimeSub = SubscriptionRecord(
+        subscriptionId: 'sub_life',
         gateway: PaymentGateway.paystack,
-        reference: 'pstk_test',
+        reference: 'pstk_life_123',
         customerEmail: 'creator@avatarstudio.io',
-        tier: SubscriptionTier.creatorPro,
+        tier: SubscriptionTier.lifetimeStudio,
         isActive: true,
         activatedAt: now,
-        renewsAt: now.add(const Duration(days: 28)),
-        amountPaid: 19.0,
-        currency: 'USD',
+        renewsAt: now.add(const Duration(days: 36500)),
+        amountPaid: 200000.0,
+        currency: 'NGN',
+        isLifetime: true,
       );
-      expect(freshSub.isExpired, isFalse);
-      expect(freshSub.isExpiringSoon, isFalse);
-      expect(freshSub.daysRemaining, 28);
+      expect(lifetimeSub.isExpired, isFalse);
+      expect(lifetimeSub.isExpiringSoon, isFalse);
+      expect(lifetimeSub.daysRemaining, 99999);
 
-      // Case 2: Expiring in 4 days -> isExpiringSoon is True (Renewal Reminder alert)
+      // Case 2: Time-limited subscription expiring in 4 days -> isExpiringSoon is True
       final expiringSoonSub = SubscriptionRecord(
         subscriptionId: 'sub_soon',
         gateway: PaymentGateway.paystack,
@@ -163,12 +166,13 @@ void main() {
         renewsAt: now.add(const Duration(days: 4)),
         amountPaid: 19.0,
         currency: 'USD',
+        isLifetime: false,
       );
       expect(expiringSoonSub.isExpired, isFalse);
       expect(expiringSoonSub.isExpiringSoon, isTrue);
       expect(expiringSoonSub.daysRemaining, 4);
 
-      // Case 3: Expired subscription -> isExpired is True
+      // Case 3: Expired time-limited subscription -> isExpired is True
       final expiredSub = SubscriptionRecord(
         subscriptionId: 'sub_expired',
         gateway: PaymentGateway.paystack,
@@ -180,68 +184,73 @@ void main() {
         renewsAt: now.subtract(const Duration(days: 5)),
         amountPaid: 19.0,
         currency: 'USD',
+        isLifetime: false,
       );
       expect(expiredSub.isExpired, isTrue);
       expect(expiredSub.daysRemaining, 0);
     });
 
     test(
-      'PaystackService initializes checkout and verifies transactions',
+      'PaystackService initializes ₦200,000 NGN checkout (20,000,000 kobo) and verifies transactions',
       () async {
         final service = PaystackService();
         final init = await service.initializeTransaction(
           email: 'creator@avatarstudio.io',
-          amountUsd: 19.0,
-          reference: 'pstk_test_12345',
+          amountNgn: 200000.0,
+          currency: 'NGN',
+          reference: 'pstk_lifetime_12345',
         );
         expect(init.success, isTrue);
         expect(init.authorizationUrl, contains('paystack.com'));
-        expect(init.reference, 'pstk_test_12345');
+        expect(init.reference, 'pstk_lifetime_12345');
 
-        final verify = await service.verifyTransaction('pstk_test_12345');
+        final verify = await service.verifyTransaction('pstk_lifetime_12345');
         expect(verify.isVerified, isTrue);
         expect(verify.status, 'success');
-        expect(verify.amount, 19.0);
+        expect(verify.amount, 200000.0);
+        expect(verify.currency, 'NGN');
       },
     );
 
     test(
-      'NowPaymentsService creates crypto invoice and verifies payment',
+      'NowPaymentsService creates crypto invoice for ₦200,000 equivalent (\$135 USD) and verifies payment',
       () async {
         final service = NowPaymentsService();
         final invoice = await service.createInvoice(
-          amountUsd: 19.0,
-          orderId: 'now_test_67890',
-          description: 'Creator Pro Monthly',
+          amountUsd: 135.0,
+          orderId: 'now_lifetime_67890',
+          description: 'TD-Avatar-Studio Lifetime License',
         );
         expect(invoice.success, isTrue);
         expect(invoice.invoiceUrl, contains('nowpayments.io'));
-        expect(invoice.orderId, 'now_test_67890');
+        expect(invoice.orderId, 'now_lifetime_67890');
 
-        final status = await service.checkPaymentStatus('now_test_67890');
+        final status = await service.checkPaymentStatus('now_lifetime_67890');
         expect(status.isVerified, isTrue);
         expect(status.paymentStatus, 'finished');
       },
     );
 
     test(
-      'BillingProvider generates 30-Day Access Code upon payment and supports direct code activation',
+      'BillingProvider handles 1-Time ₦200,000 payment, generates TD-LIFE- access code, and enables lifetime studio access',
       () async {
         final storage = StorageService();
         await storage.init();
         final licenseProvider = LicenseProvider();
         final billingProvider = BillingProvider(storageService: storage);
 
-        expect(billingProvider.selectedPlan.id, 'creator_pro_monthly');
-        expect(billingProvider.selectedPlan.priceUsd, 19.0);
+        expect(billingProvider.selectedPlan.id, 'studio_lifetime_200k');
+        expect(billingProvider.selectedPlan.priceNgn, 200000.0);
+        expect(billingProvider.selectedPlan.formattedPrice, contains('200,000'));
         expect(billingProvider.selectedGateway, PaymentGateway.paystack);
 
-        // Initiate checkout
+        // Initiate 1-time checkout
         await billingProvider.initiateMonthlyCheckout(
           customerEmail: 'creator@avatarstudio.io',
           licenseProvider: licenseProvider,
         );
         expect(billingProvider.currentReference, isNotNull);
+        expect(billingProvider.currentReference, contains('pstk_lifetime_'));
 
         // Verify and activate
         final activated = await billingProvider.verifyAndActivatePayment(
@@ -249,30 +258,27 @@ void main() {
         );
         expect(activated, isTrue);
         expect(billingProvider.hasActiveSubscription, isTrue);
-        expect(
-          billingProvider.activeSubscription?.daysRemaining,
-          greaterThanOrEqualTo(29),
-        );
+        expect(billingProvider.isLifetime, isTrue);
+        expect(billingProvider.daysRemaining, 99999);
         expect(licenseProvider.isPro, isTrue);
 
-        // Verify 30-Day Access Code was generated and stored
+        // Verify Lifetime Access Code (TD-LIFE-) was generated and stored
         final generatedCode = billingProvider.activeAccessCode;
         expect(generatedCode, isNotEmpty);
-        expect(generatedCode, startsWith('TD-PRO-'));
+        expect(generatedCode, startsWith('TD-LIFE-'));
 
-        // Test activating with an existing 30-day Access Code
-        final newEntCode = LicensingService.generate30DayAccessCode(
-          SubscriptionTier.enterpriseStudio,
-        );
+        // Test activating with an existing Lifetime Access Code
+        final newLifeCode = LicensingService.generateLifetimeAccessCode();
         final codeActivated = await billingProvider.activateWithAccessCode(
-          newEntCode,
+          newLifeCode,
           licenseProvider: licenseProvider,
         );
         expect(codeActivated, isTrue);
-        expect(billingProvider.activeAccessCode, newEntCode);
-        expect(licenseProvider.tier, SubscriptionTier.enterpriseStudio);
+        expect(billingProvider.activeAccessCode, newLifeCode);
+        expect(billingProvider.isLifetime, isTrue);
+        expect(licenseProvider.tier, SubscriptionTier.lifetimeStudio);
 
-        // Cancel subscription
+        // Cancel / reset subscription
         await billingProvider.cancelSubscription(
           licenseProvider: licenseProvider,
         );

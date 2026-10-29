@@ -20,6 +20,7 @@ class PaystackVerifyResult {
   final bool isVerified;
   final String reference;
   final double amount;
+  final String currency;
   final String status;
   final String customerEmail;
   final String? message;
@@ -28,6 +29,7 @@ class PaystackVerifyResult {
     required this.isVerified,
     required this.reference,
     required this.amount,
+    this.currency = 'NGN',
     required this.status,
     required this.customerEmail,
     this.message,
@@ -39,11 +41,12 @@ class PaystackService {
 
   PaystackService({http.Client? client}) : _client = client ?? http.Client();
 
-  /// Initializes a monthly recurring checkout session with Paystack
+  /// Initializes a 1-time checkout session with Paystack in NGN (₦200,000)
   Future<PaystackInitResult> initializeTransaction({
     required String email,
-    required double amountUsd,
+    required double amountNgn,
     required String reference,
+    String currency = 'NGN',
     String? planCode,
   }) async {
     final url = Uri.parse(
@@ -62,13 +65,15 @@ class PaystackService {
               'email': email.trim().isEmpty
                   ? 'creator@avatarstudio.io'
                   : email.trim(),
-              'amount': (amountUsd * 100).toInt(), // in cents
-              'currency': 'USD',
+              // In Paystack, amount for NGN is in kobo (200,000 NGN * 100 = 20,000,000 kobo)
+              'amount': (amountNgn * 100).toInt(),
+              'currency': currency,
               'reference': reference,
               'callback_url': BillingConfig.paystackLocalCallbackUrl,
               'plan': ?planCode,
               'metadata': {
-                'product': 'Avatar Studio Monthly Subscription',
+                'product': 'TD-Avatar-Studio Lifetime License',
+                'amount_ngn': amountNgn,
                 'reference': reference,
               },
             }),
@@ -120,31 +125,37 @@ class PaystackService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         if (data['status'] == true && data['data'] != null) {
-          final res = data['data'] as Map<String, dynamic>;
-          final status = res['status'] as String? ?? '';
-          final amount = ((res['amount'] as num?)?.toDouble() ?? 0.0) / 100.0;
-          final customer = res['customer'] as Map<String, dynamic>?;
+          final resData = data['data'] as Map<String, dynamic>;
+          final status = resData['status'] as String? ?? 'failed';
+          final isSuccess = status.toLowerCase() == 'success';
+          final rawAmount =
+              (resData['amount'] as num?)?.toDouble() ?? 20000000.0;
+          final paidAmount = rawAmount > 1000 ? rawAmount / 100.0 : rawAmount;
+          final customer = resData['customer'] as Map<String, dynamic>?;
           final email = customer?['email'] as String? ?? '';
+          final currency = resData['currency'] as String? ?? 'NGN';
 
-          if (status.toLowerCase() == 'success') {
-            return PaystackVerifyResult(
-              isVerified: true,
-              reference: reference,
-              amount: amount,
-              status: status,
-              customerEmail: email,
-            );
-          }
+          return PaystackVerifyResult(
+            isVerified: isSuccess,
+            reference: resData['reference'] as String? ?? reference,
+            amount: paidAmount,
+            currency: currency,
+            status: status,
+            customerEmail: email,
+          );
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Mock validation fallback
+    }
 
-    // Simulated sandbox verification for testing / offline demonstrations
-    if (reference.startsWith('pstk_') || reference.startsWith('mock_')) {
+    // Verify mock fallback for reference formats (pstk_...)
+    if (reference.startsWith('pstk_')) {
       return PaystackVerifyResult(
         isVerified: true,
         reference: reference,
-        amount: 19.0,
+        amount: 200000.0,
+        currency: 'NGN',
         status: 'success',
         customerEmail: 'creator@avatarstudio.io',
       );
@@ -154,10 +165,10 @@ class PaystackService {
       isVerified: false,
       reference: reference,
       amount: 0.0,
-      status: 'pending',
+      currency: 'NGN',
+      status: 'failed',
       customerEmail: '',
-      message:
-          'Payment verification pending. Complete checkout in your browser.',
+      message: 'Could not verify Paystack payment.',
     );
   }
 }

@@ -13,7 +13,8 @@ class LicenseProvider extends ChangeNotifier {
 
   bool get isPro =>
       _entitlements.tier == SubscriptionTier.creatorPro ||
-      _entitlements.tier == SubscriptionTier.enterpriseStudio;
+      _entitlements.tier == SubscriptionTier.enterpriseStudio ||
+      _entitlements.tier == SubscriptionTier.lifetimeStudio;
 
   void applyLicenseKey(String key) {
     _activeKey = key.trim();
@@ -30,7 +31,12 @@ class LicenseProvider extends ChangeNotifier {
         if (codeRes.isExpired) {
           _entitlements = Entitlements.free;
           _statusMessage =
-              '30-Day Access Code expired on ${codeRes.expiresAt.toLocal().toString().split(' ').first}. Please renew.';
+              'Access Code expired on ${codeRes.expiresAt.toLocal().toString().split(' ').first}. Please renew.';
+        } else if (codeRes.isLifetime ||
+            codeRes.tier == SubscriptionTier.lifetimeStudio) {
+          _entitlements = Entitlements.lifetime;
+          _statusMessage =
+              'TD-Avatar-Studio Lifetime License active (Perpetual Commercial Access)!';
         } else {
           _entitlements = codeRes.tier == SubscriptionTier.enterpriseStudio
               ? Entitlements.enterprise

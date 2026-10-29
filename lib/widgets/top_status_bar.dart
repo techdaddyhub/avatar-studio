@@ -155,7 +155,7 @@ class TopStatusBar extends StatelessWidget {
               ),
               const SizedBox(width: 8),
 
-              // 30-Day Subscription / Renewal Reminder Pill
+              // Subscription / License Status Pill
               if (billProv.isExpired)
                 _buildPill(
                   label: 'SUB EXPIRED',
@@ -172,7 +172,7 @@ class TopStatusBar extends StatelessWidget {
                 )
               else if (billProv.hasActiveSubscription)
                 _buildPill(
-                  label: '30D PRO (${billProv.daysRemaining}D)',
+                  label: billProv.isLifetime ? 'LIFETIME PRO' : '30D PRO (${billProv.daysRemaining}D)',
                   active: true,
                   activeColor: AppColors.statusOnline,
                   inactiveColor: AppColors.statusOnline,

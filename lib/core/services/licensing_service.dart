@@ -1,7 +1,12 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
-enum SubscriptionTier { freeStarter, creatorPro, enterpriseStudio }
+enum SubscriptionTier {
+  freeStarter,
+  creatorPro,
+  enterpriseStudio,
+  lifetimeStudio,
+}
 
 class Entitlements {
   final SubscriptionTier tier;
@@ -51,6 +56,16 @@ class Entitlements {
     maxAvatarProfiles: 999,
     statusLabel: 'Enterprise Studio Multi-Seat License (30-Day Access)',
   );
+
+  static const Entitlements lifetime = Entitlements(
+    tier: SubscriptionTier.lifetimeStudio,
+    canImportCustomModels: true,
+    canUseCommercialOBS: true,
+    canUseQualityMode: true,
+    canExportHighBitrate: true,
+    maxAvatarProfiles: 999,
+    statusLabel: 'TD-Avatar-Studio Lifetime License (₦200,000 1-Time Access)',
+  );
 }
 
 class AccessCodeResult {
@@ -60,6 +75,7 @@ class AccessCodeResult {
   final bool isExpired;
   final int daysRemaining;
   final String code;
+  final bool isLifetime;
   final String? errorMessage;
 
   const AccessCodeResult({
@@ -69,6 +85,7 @@ class AccessCodeResult {
     required this.isExpired,
     required this.daysRemaining,
     required this.code,
+    this.isLifetime = false,
     this.errorMessage,
   });
 }
@@ -77,6 +94,26 @@ class LicensingService {
   LicensingService._();
 
   static const String _licenseSalt = 'TD_AVATAR_STUDIO_SALT_2026';
+
+  /// Generates a signed Lifetime Access Code for 1-time ₦200,000 payment
+  static String generateLifetimeAccessCode({
+    SubscriptionTier tier = SubscriptionTier.lifetimeStudio,
+  }) {
+    // 100 years into the future for perpetual lifetime access
+    final expiry = DateTime.now().add(const Duration(days: 36500));
+    final epochSeconds = expiry.millisecondsSinceEpoch ~/ 1000;
+    final expiryHex =
+        epochSeconds.toRadixString(16).toUpperCase().padLeft(8, '0');
+
+    final payload = 'TD-LIFE-$expiryHex';
+    final signature = sha256
+        .convert(utf8.encode('$payload$_licenseSalt'))
+        .toString()
+        .substring(0, 4)
+        .toUpperCase();
+
+    return '$payload-$signature';
+  }
 
   /// Generates a signed 30-day access code: TD-{TIER}-{EXPIRY_HEX}-{SIG}
   static String generate30DayAccessCode(
@@ -99,7 +136,7 @@ class LicensingService {
     return '$payload-$signature';
   }
 
-  /// Validates a 30-day access code and checks if it is active or expired
+  /// Validates an access code and checks if it is active or expired
   static AccessCodeResult validateAccessCode(String code) {
     final clean = code.trim().toUpperCase();
     if (clean.isEmpty) {
@@ -116,7 +153,7 @@ class LicensingService {
 
     final parts = clean.split('-');
 
-    // Format: TD-{PRO|ENT}-{EXPIRY_HEX}-{SIG}
+    // Format: TD-{LIFE|PRO|ENT}-{EXPIRY_HEX}-{SIG}
     if (parts.length == 4 && parts[0] == 'TD') {
       final tierCode = parts[1];
       final expiryHex = parts[2];
@@ -158,14 +195,23 @@ class LicensingService {
         epochSeconds * 1000,
       );
       final now = DateTime.now();
-      final isExpired = now.isAfter(expiresAt);
-      final diff = expiresAt.difference(now);
-      final daysRemaining =
-          diff.isNegative ? 0 : (diff.inSeconds / 86400).ceil();
 
-      final tier = tierCode == 'ENT'
-          ? SubscriptionTier.enterpriseStudio
-          : SubscriptionTier.creatorPro;
+      // Check for Lifetime code
+      final isLifetime = tierCode == 'LIFE';
+      final isExpired = isLifetime ? false : now.isAfter(expiresAt);
+      final diff = expiresAt.difference(now);
+      final daysRemaining = isLifetime
+          ? 99999
+          : (diff.isNegative ? 0 : (diff.inSeconds / 86400).ceil());
+
+      final SubscriptionTier tier;
+      if (isLifetime) {
+        tier = SubscriptionTier.lifetimeStudio;
+      } else if (tierCode == 'ENT') {
+        tier = SubscriptionTier.enterpriseStudio;
+      } else {
+        tier = SubscriptionTier.creatorPro;
+      }
 
       return AccessCodeResult(
         isValid: true,
@@ -173,6 +219,7 @@ class LicensingService {
         expiresAt: expiresAt,
         isExpired: isExpired,
         daysRemaining: daysRemaining,
+        isLifetime: isLifetime,
         code: clean,
       );
     }
@@ -196,9 +243,10 @@ class LicensingService {
       return AccessCodeResult(
         isValid: true,
         tier: entitlements.tier,
-        expiresAt: DateTime.now().add(const Duration(days: 30)),
+        expiresAt: DateTime.now().add(const Duration(days: 36500)),
         isExpired: false,
-        daysRemaining: 30,
+        daysRemaining: 99999,
+        isLifetime: true,
         code: clean,
       );
     }
@@ -221,10 +269,13 @@ class LicensingService {
       return Entitlements.free;
     }
 
-    // If it's a 30-day access code:
+    // If it's a TD access code:
     if (cleanKey.startsWith('TD-')) {
       final codeRes = validateAccessCode(cleanKey);
       if (codeRes.isValid && !codeRes.isExpired) {
+        if (codeRes.isLifetime || codeRes.tier == SubscriptionTier.lifetimeStudio) {
+          return Entitlements.lifetime;
+        }
         return codeRes.tier == SubscriptionTier.enterpriseStudio
             ? Entitlements.enterprise
             : Entitlements.pro;

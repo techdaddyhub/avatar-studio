@@ -49,7 +49,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Account & Monthly Subscriptions',
+                      'Account & Commercial Licensing',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
@@ -58,7 +58,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      '30-Day Access Code licensing via Paystack (Cards/Bank) and NOWPayments (Cryptocurrency).',
+                      '1-Time Lifetime Commercial Studio License (₦200,000 NGN) via Paystack & NOWPayments.',
                       style: TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -77,7 +77,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                       color: AppColors.accentRed,
                     ),
                     label: const Text(
-                      'CANCEL SUBSCRIPTION',
+                      'RESET LICENSE',
                       style: TextStyle(color: AppColors.accentRed),
                     ),
                   ),
@@ -85,13 +85,13 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
             ),
             const SizedBox(height: 20),
 
-            // 1. Proactive Renewal Reminder Banner (if expiring soon or expired)
-            if (billProv.isExpiringSoon || billProv.isExpired) ...[
+            // 1. Proactive Renewal Reminder Banner (if not lifetime and expiring soon or expired)
+            if (!billProv.isLifetime && (billProv.isExpiringSoon || billProv.isExpired)) ...[
               _buildRenewalAlertBanner(billProv, licProv),
               const SizedBox(height: 20),
             ],
 
-            // 2. 30-Day Access Code Display Box (When active subscription exists)
+            // 2. Access Code Display Box (When active subscription/license exists)
             if (hasSub && sub != null && sub.accessCode.isNotEmpty) ...[
               _buildAccessCodeDisplayCard(context, sub),
               const SizedBox(height: 20),
@@ -129,7 +129,9 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                       children: [
                         Text(
                           hasSub
-                              ? 'ACTIVE 30-DAY SUBSCRIPTION'
+                              ? (sub!.isLifetime
+                                  ? 'ACTIVE 1-TIME LIFETIME STUDIO LICENSE'
+                                  : 'ACTIVE 30-DAY SUBSCRIPTION')
                               : 'COMMUNITY EDITION (FREE LOCAL DESKTOP)',
                           style: TextStyle(
                             fontSize: 11,
@@ -143,7 +145,9 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                         const SizedBox(height: 4),
                         Text(
                           hasSub
-                              ? '${sub!.tier.name.toUpperCase()} — ${sub.daysRemaining} Days Remaining'
+                              ? (sub!.isLifetime
+                                  ? 'TD-AVATAR-STUDIO LIFETIME LICENSE (₦200,000)'
+                                  : '${sub.tier.name.toUpperCase()} — ${sub.daysRemaining} Days Remaining')
                               : licProv.entitlements.statusLabel,
                           style: const TextStyle(
                             fontSize: 16,
@@ -154,8 +158,10 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                         const SizedBox(height: 4),
                         Text(
                           hasSub
-                              ? 'Activated on ${sub!.activatedAt.toLocal().toString().split(' ').first} • Renews on ${sub.renewsAt.toLocal().toString().split(' ').first}'
-                              : 'Unlimited local desktop rendering. Upgrade below to generate your 30-Day Access Code for commercial streaming.',
+                              ? (sub!.isLifetime
+                                  ? 'Activated on ${sub.activatedAt.toLocal().toString().split(' ').first} • Permanent Commercial Ownership (No Recurring Fees)'
+                                  : 'Activated on ${sub.activatedAt.toLocal().toString().split(' ').first} • Renews on ${sub.renewsAt.toLocal().toString().split(' ').first}')
+                              : 'Unlimited local desktop rendering. Upgrade below to generate your 1-Time Lifetime Access Code (₦200,000) for commercial streaming.',
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
@@ -169,9 +175,9 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
             ),
             const SizedBox(height: 24),
 
-            // 4. Monthly Subscription Plans
+            // 4. Commercial Studio License Plan
             const Text(
-              'Select Monthly Subscription Plan',
+              '1-Time Lifetime Commercial Studio License',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 12),
@@ -214,7 +220,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                             Text(
                               plan.formattedPrice,
                               style: const TextStyle(
-                                fontSize: 20,
+                                fontSize: 22,
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.primaryCyan,
                               ),
@@ -262,12 +268,12 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Payment Method & Billing Gateway',
+                    'Payment Method & 1-Time Checkout',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'After completing payment, a unique 30-Day Access Code will be generated and applied to this installation.',
+                    'After completing the 1-time payment of ₦200,000 (or \$135 crypto), a permanent Lifetime Access Code (TD-LIFE-XXXX-YYYY) is generated and unlocked on this installation.',
                     style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 16),
@@ -277,8 +283,8 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                       Expanded(
                         child: _buildGatewayTile(
                           gateway: PaymentGateway.paystack,
-                          title: 'Paystack Billing',
-                          subtitle: 'Cards, Bank Transfer, Apple Pay (30-Day Access)',
+                          title: 'Paystack (₦200,000 NGN)',
+                          subtitle: 'Cards, Bank Transfer, USSD (Instant Lifetime Access)',
                           icon: Icons.credit_card,
                           isSelected:
                               billProv.selectedGateway ==
@@ -292,8 +298,8 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                       Expanded(
                         child: _buildGatewayTile(
                           gateway: PaymentGateway.nowpayments,
-                          title: 'NOWPayments Crypto',
-                          subtitle: 'USDT, BTC, ETH, Solana, BNB (30-Day Access)',
+                          title: 'NOWPayments Crypto (\$135 USD)',
+                          subtitle: 'USDT, BTC, ETH, Solana, BNB (Instant Lifetime Access)',
                           icon: Icons.currency_bitcoin,
                           isSelected:
                               billProv.selectedGateway ==
@@ -312,7 +318,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                     controller: _emailController,
                     decoration: const InputDecoration(
                       labelText:
-                          'Customer Email for Receipt & 30-Day Access Code',
+                          'Customer Email for Lifetime License Receipt & Access Code',
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
@@ -333,7 +339,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                         label: Text(
                           billProv.isProcessing
                               ? 'PREPARING CHECKOUT...'
-                              : 'GET 30-DAY ACCESS VIA ${billProv.selectedGateway == PaymentGateway.paystack ? 'PAYSTACK' : 'NOWPAYMENTS'} (${billProv.selectedPlan.formattedPrice})',
+                              : 'GET 1-TIME LIFETIME ACCESS VIA ${billProv.selectedGateway == PaymentGateway.paystack ? 'PAYSTACK (₦200,000)' : 'NOWPAYMENTS (\$135)'}',
                         ),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -348,7 +354,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                                   licenseProvider: licProv,
                                 ),
                           icon: const Icon(Icons.refresh, size: 16),
-                          label: const Text('VERIFY & GET ACCESS CODE'),
+                          label: const Text('VERIFY & GET LIFETIME ACCESS CODE'),
                         ),
                     ],
                   ),
@@ -432,18 +438,18 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
             ),
             const SizedBox(height: 24),
 
-            // 6. Manual 30-Day Access Code Activation Card
+            // 6. Manual Access Code Activation Card
             GlassCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Activate with 30-Day Access Code',
+                    'Activate with Access Code / License Key',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Already have a 30-day Access Code (e.g., from email receipt, renewal, or another device)? Enter it below to activate your installation immediately.',
+                    'Already have a Lifetime Access Code (e.g., TD-LIFE-XXXX-YYYY from email receipt or previous purchase)? Enter it below to unlock this installation immediately.',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -457,7 +463,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                         child: TextField(
                           controller: _keyController,
                           decoration: const InputDecoration(
-                            hintText: 'e.g. TD-PRO-7E1A-884F or TD-ENT-9A2C-44B1',
+                            hintText: 'e.g. TD-LIFE-7E1A-884F or TD-PRO-7E1A-884F',
                             border: OutlineInputBorder(),
                             isDense: true,
                           ),
@@ -527,9 +533,9 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
             children: [
               const Icon(Icons.vpn_key_outlined, size: 20, color: AppColors.primaryCyan),
               const SizedBox(width: 10),
-              const Text(
-                'YOUR 30-DAY ACCESS CODE',
-                style: TextStyle(
+              Text(
+                sub.isLifetime ? 'YOUR LIFETIME ACCESS CODE' : 'YOUR 30-DAY ACCESS CODE',
+                style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.5,
@@ -544,7 +550,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  '${sub.daysRemaining} DAYS REMAINING',
+                  sub.isLifetime ? 'LIFETIME ACTIVE' : '${sub.daysRemaining} DAYS REMAINING',
                   style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -581,7 +587,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
                     Clipboard.setData(ClipboardData(text: sub.accessCode));
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('30-Day Access Code copied to clipboard!'),
+                        content: Text('Access Code copied to clipboard!'),
                       ),
                     );
                   },
@@ -598,7 +604,7 @@ class _AccountSubscriptionViewState extends State<AccountSubscriptionView> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Keep this code safe. You can use it to re-activate this installation or transfer your active 30-day access.',
+            'Keep this code safe. You can use it to re-activate this installation or transfer your commercial studio license.',
             style: TextStyle(fontSize: 11, color: AppColors.textMuted),
           ),
         ],

@@ -111,7 +111,7 @@ class NowPaymentsService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final status = (data['payment_status'] as String? ?? '').toLowerCase();
-        final amount = (data['price_amount'] as num?)?.toDouble() ?? 19.0;
+        final amount = (data['price_amount'] as num?)?.toDouble() ?? 135.0;
         final payCur = data['pay_currency'] as String? ?? 'USDT';
 
         if (status == 'finished' || status == 'confirmed') {
@@ -133,7 +133,7 @@ class NowPaymentsService {
         isVerified: true,
         orderId: paymentIdOrOrderId,
         paymentStatus: 'finished',
-        amount: 19.0,
+        amount: 135.0,
         payCurrency: 'USDT',
       );
     }

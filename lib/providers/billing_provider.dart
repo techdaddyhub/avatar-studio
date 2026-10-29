@@ -12,7 +12,7 @@ class BillingProvider extends ChangeNotifier {
   final PaystackService _paystackService;
   final NowPaymentsService _nowPaymentsService;
 
-  BillingPlan _selectedPlan = BillingPlan.creatorProMonthly;
+  BillingPlan _selectedPlan = BillingPlan.lifetimeStudio;
   PaymentGateway _selectedGateway = PaymentGateway.paystack;
   PaymentStatus _status = PaymentStatus.idle;
 
@@ -43,6 +43,7 @@ class BillingProvider extends ChangeNotifier {
       _activeSubscription != null &&
       _activeSubscription!.isActive &&
       !_activeSubscription!.isExpired;
+  bool get isLifetime => _activeSubscription?.isLifetime ?? false;
   bool get isExpiringSoon =>
       _activeSubscription != null && _activeSubscription!.isExpiringSoon;
   bool get isExpired =>
@@ -77,26 +78,27 @@ class BillingProvider extends ChangeNotifier {
     _isProcessing = true;
     _status = PaymentStatus.pending;
     _statusMessage =
-        'Initiating monthly checkout with ${_selectedGateway == PaymentGateway.paystack ? 'Paystack' : 'NOWPayments Crypto'}...';
+        'Initiating 1-time checkout for ${_selectedPlan.title} (${_selectedPlan.formattedPrice}) via ${_selectedGateway == PaymentGateway.paystack ? 'Paystack' : 'NOWPayments Crypto'}...';
     notifyListeners();
 
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final prefix = _selectedGateway == PaymentGateway.paystack ? 'pstk' : 'now';
-    _currentReference = '${prefix}_${_selectedPlan.id}_$timestamp';
+    _currentReference = '${prefix}_lifetime_$timestamp';
 
     try {
       if (_selectedGateway == PaymentGateway.paystack) {
         final result = await _paystackService.initializeTransaction(
           email: customerEmail,
-          amountUsd: _selectedPlan.priceUsd,
+          amountNgn: _selectedPlan.priceNgn,
           reference: _currentReference!,
+          currency: 'NGN',
           planCode: _selectedPlan.paystackPlanCode,
         );
 
         if (result.success) {
           _currentCheckoutUrl = result.authorizationUrl;
           _statusMessage =
-              'Paystack monthly checkout ready. Opening browser...';
+              'Paystack ₦200,000 checkout ready. Opening browser...';
           await _launchUrlSafely(_currentCheckoutUrl!);
           _isProcessing = false;
           notifyListeners();
@@ -108,7 +110,7 @@ class BillingProvider extends ChangeNotifier {
           amountUsd: _selectedPlan.priceUsd,
           orderId: _currentReference!,
           description:
-              'Avatar Studio ${_selectedPlan.title} Monthly Subscription',
+              'TD-Avatar-Studio Lifetime License (₦200,000 1-Time Access)',
         );
 
         if (result.success) {
@@ -147,8 +149,8 @@ class BillingProvider extends ChangeNotifier {
     notifyListeners();
 
     bool verified = false;
-    double paidAmount = _selectedPlan.priceUsd;
-    String currency = 'USD';
+    double paidAmount = _selectedPlan.priceNgn;
+    String currency = 'NGN';
     String email = 'creator@avatarstudio.io';
 
     try {
@@ -159,6 +161,7 @@ class BillingProvider extends ChangeNotifier {
         verified = res.isVerified;
         if (res.customerEmail.isNotEmpty) email = res.customerEmail;
         if (res.amount > 0) paidAmount = res.amount;
+        if (res.currency.isNotEmpty) currency = res.currency;
       } else {
         final res = await _nowPaymentsService.checkPaymentStatus(
           _currentReference!,
@@ -169,36 +172,34 @@ class BillingProvider extends ChangeNotifier {
 
       if (verified) {
         final now = DateTime.now();
-        final renewsAt = now.add(const Duration(days: 30));
+        final renewsAt = now.add(const Duration(days: 36500)); // 100 years perpetual
 
-        // Generate cryptographically signed 30-Day Access Code
-        final accessCode = LicensingService.generate30DayAccessCode(
-          _selectedPlan.tier,
-          expiresAt: renewsAt,
-        );
+        // Generate cryptographically signed Lifetime Access Code
+        final accessCode = LicensingService.generateLifetimeAccessCode();
 
         _activeSubscription = SubscriptionRecord(
-          subscriptionId: 'sub_${now.millisecondsSinceEpoch}',
+          subscriptionId: 'life_${now.millisecondsSinceEpoch}',
           gateway: _selectedGateway,
           reference: _currentReference!,
           customerEmail: email,
-          tier: _selectedPlan.tier,
+          tier: SubscriptionTier.lifetimeStudio,
           isActive: true,
           activatedAt: now,
           renewsAt: renewsAt,
           amountPaid: paidAmount,
           currency: currency,
           accessCode: accessCode,
+          isLifetime: true,
         );
 
         await storageService.saveSubscription(_activeSubscription!);
 
-        // Apply access code to license provider
+        // Apply lifetime access code to license provider
         licenseProvider.applyLicenseKey(accessCode);
 
         _status = PaymentStatus.completed;
         _statusMessage =
-            'Payment confirmed! 30-Day Access Code: $accessCode (Valid for 30 days)';
+            'Payment confirmed! Lifetime Access Code: $accessCode (1-Time ₦200,000 Payment)';
         _isProcessing = false;
         notifyListeners();
         return true;
@@ -244,6 +245,8 @@ class BillingProvider extends ChangeNotifier {
     }
 
     final now = DateTime.now();
+    final isLife = result.isLifetime || result.tier == SubscriptionTier.lifetimeStudio;
+
     _activeSubscription = SubscriptionRecord(
       subscriptionId: 'code_${now.millisecondsSinceEpoch}',
       gateway: PaymentGateway.paystack,
@@ -253,18 +256,19 @@ class BillingProvider extends ChangeNotifier {
       isActive: true,
       activatedAt: now,
       renewsAt: result.expiresAt,
-      amountPaid:
-          result.tier == SubscriptionTier.enterpriseStudio ? 79.0 : 19.0,
-      currency: 'USD',
+      amountPaid: 200000.0,
+      currency: 'NGN',
       accessCode: result.code,
+      isLifetime: isLife,
     );
 
     await storageService.saveSubscription(_activeSubscription!);
     licenseProvider.applyLicenseKey(result.code);
 
     _status = PaymentStatus.completed;
-    _statusMessage =
-        '30-Day Access Code activated! Active for ${result.daysRemaining} more days.';
+    _statusMessage = isLife
+        ? 'TD-Avatar-Studio Lifetime License activated permanently!'
+        : 'Access Code activated! Active for ${result.daysRemaining} more days.';
     _isProcessing = false;
     notifyListeners();
     return true;
